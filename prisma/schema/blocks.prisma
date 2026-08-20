@@ -1,0 +1,23 @@
+// @polsia:user-owned — matching-feed Block model.
+//
+// Linked to better-auth's `User` by SCALAR `blockerId` / `blockedId` only (no
+// Prisma `@relation` back to `User`). `auth.prisma` is framework-owned and the
+// better-auth AGENT.md forbids editing it to add back-relation fields.
+//
+// Blocks are one-way: row(blockerId=A, blockedId=B) means A hides B. It says
+// nothing about whether B can still see A — the inverse row is created when B
+// independently blocks A.
+//
+// Datasource + generator live in `prisma/schema/_base.prisma` — do NOT
+// redeclare them here.
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId, createdAt])
+  @@index([blockedId])
+}

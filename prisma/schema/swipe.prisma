@@ -1,0 +1,25 @@
+// @polsia:user-owned — matching-feed Swipe model.
+//
+// Linked to better-auth's `User` by SCALAR `fromUserId` / `toUserId` only (no
+// Prisma `@relation` back to `User`). `auth.prisma` is framework-owned and the
+// better-auth AGENT.md forbids editing it to add back-relation fields.
+//
+// Datasource + generator live in `prisma/schema/_base.prisma` — do NOT
+// redeclare them here.
+
+enum SwipeDecision {
+  ACCEPT
+  REJECT
+}
+
+model Swipe {
+  id         String        @id @default(cuid())
+  fromUserId String
+  toUserId   String
+  decision   SwipeDecision
+  createdAt  DateTime      @default(now())
+
+  @@unique([fromUserId, toUserId])
+  @@index([fromUserId, createdAt])
+  @@index([toUserId])
+}

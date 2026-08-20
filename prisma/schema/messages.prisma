@@ -1,0 +1,65 @@
+// @polsia:user-owned — in-app messaging models.
+//
+// Linked to better-auth's `User` by SCALAR `userAId` / `userBId` / `senderId`
+// columns only — NEVER a Prisma `@relation` back to `User`. `auth.prisma` is
+// framework-owned (the better-auth AGENT.md forbids editing it to add a back-
+// relation field); all FK-style references live as scalar ids and we read the
+// `User` / `Profile` rows in app code by id.
+//
+// Canonical-pair invariant — the SAME two users always map to ONE
+// `MessageThread` row. The `@@unique([userAId, userBId])` index dedupes
+// concurrent writes, but only because every writer sorts its pair into a
+// deterministic order before insert. Implementers of a future
+// `POST /api/messages/threads` MUST do:
+//     const [a, b] = [userA, userB].sort();
+//     await prisma.messageThread.upsert({
+//       where: { userAId_userBId: { userAId: a, userBId: b } },
+//       create: { userAId: a, userBId: b, lastMessageAt: new Date() },
+//       update: { lastMessageAt: new Date() },
+//     });
+// so any participant can list "their" conversations with a single
+// `WHERE userAId = ? OR userBId = ?` and never see two rows for the same
+// chat. Without that sort the index is NOT enough — two writers racing from
+// opposite sides can both reach `create()` and end up with two threads
+// (the unique index would then reject whichever loses the race, masking the
+// bug rather than fixing the conversation list).
+//
+// Both `@@index([userAId, lastMessageAt(desc)])` and
+// `@@index([userBId, lastMessageAt(desc)])` exist so the listing query
+// `WHERE userAId = ? OR userBId = ? ORDER BY lastMessageAt DESC` uses an
+// index on either side without forcing a sort.
+//
+// Datasource + generator live in `prisma/schema/_base.prisma` — do NOT
+// redeclare them here.
+
+model MessageThread {
+  id            String   @id @default(cuid())
+  userAId       String
+  userBId       String
+  // Bumped on every new Message (and on the upsert that initially opens the
+  // thread). Denormalized so the listing endpoint doesn't have to JOIN to
+  // the most recent Message per thread — critical because the scan we care
+  // about is "my conversations ordered by recency", not "all messages".
+  lastMessageAt DateTime
+  createdAt     DateTime @default(now())
+
+  @@unique([userAId, userBId])
+  @@index([userAId, lastMessageAt(sort: Desc)])
+  @@index([userBId, lastMessageAt(sort: Desc)])
+}
+
+model Message {
+  id        String    @id @default(cuid())
+  threadId  String
+  senderId  String
+  body      String
+  createdAt DateTime  @default(now())
+  // Null until the recipient opens the thread. Set by a future
+  // PATCH /api/messages/threads/:id/read write; out of scope for this turn.
+  readAt    DateTime?
+
+  // Drives the "last message preview" lookup per thread — list per-thread
+  // newest-first, take the first row per threadId.
+  @@index([threadId, createdAt(sort: Desc)])
+  @@index([senderId, createdAt(sort: Desc)])
+}

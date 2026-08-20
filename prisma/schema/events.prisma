@@ -1,0 +1,47 @@
+// @polsia:user-owned — Events models for /events (create + list + RSVP).
+//
+// The `Event` table is the host-owned record inserted by `POST /api/events`
+// and surfaced by `GET /api/events` on the `/events` listing. `EventRsvp` is
+// the per-row RSVP table (used by <EventCard/>'s RSVP button). Both live in
+// the same file because they share the same FK semantics.
+//
+// Linked to better-auth's `User` by SCALAR `userId` only — no Prisma
+// `@relation` back to `User`. `auth.prisma` is framework-owned and the
+// better-auth AGENT.md forbids editing it to add a back-relation field.
+//
+// `EventRsvp.eventId` is also deliberately a plain scalar String: a stale
+// RSVP on an unknown event upserts and returns 200, which is the idempotent
+// behaviour the brief requires. The DB does NOT enforce that an RSVP points
+// at an existing event — that is the accepted tradeoff for the FK being
+// scalar-only.
+//
+// `EventRsvp.@@unique([eventId, userId])` is the upsert key: the duplicate
+// RSVP branch lands on `update: {}` and returns the original row. See
+// `POST /api/events/[id]/rsvp` and the contract tests.
+//
+// Datasource + generator live in `prisma/schema/_base.prisma` — do NOT
+// redeclare them here.
+
+model Event {
+  id           String   @id @default(cuid())
+  userId       String                       // FK to auth User.id — scalar, no @relation
+  title        String
+  hostName     String
+  startTime    DateTime
+  city         String
+  maxAttendees Int
+  createdAt    DateTime @default(now())
+
+  @@index([startTime])                       // GET /api/events: orderBy startTime ASC
+  @@index([userId])
+}
+
+model EventRsvp {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+}

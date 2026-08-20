@@ -1,0 +1,47 @@
+// @polsia:user-owned — matching-feed Discovery + Connection models.
+//
+// Linked to better-auth's `User` by SCALAR id columns only (no Prisma
+// `@relation` back to `User`). `auth.prisma` is framework-owned and the
+// better-auth AGENT.md forbids editing it to add back-relation fields.
+//
+// Discovery captures "viewer saw/engaged with target" — `status` distinguishes
+// a passive pass ('seen') from an active intent-to-connect ('connected', legacy
+// 'passed' kept for backwards-compatible rows). The (viewerUserId,
+// targetUserId) unique index makes /api/discover/seen idempotent under
+// concurrent clicks.
+//
+// Connection captures an explicit intent-to-connect from viewer → target. The
+// (fromUserId, toUserId) unique index makes /api/discover/connect idempotent
+// (mirror of swipe.prisma).
+//
+// Datasource + generator live in `prisma/schema/_base.prisma` — do NOT
+// redeclare them here.
+
+enum DiscoveryStatus {
+  seen
+  connected
+  passed
+}
+
+model Discovery {
+  id             String         @id @default(cuid())
+  viewerUserId   String
+  targetUserId   String
+  status         DiscoveryStatus @default(seen)
+  seenAt         DateTime       @default(now())
+
+  @@unique([viewerUserId, targetUserId])
+  @@index([viewerUserId, status, seenAt])
+  @@index([targetUserId])
+}
+
+model Connection {
+  id         String   @id @default(cuid())
+  fromUserId String
+  toUserId   String
+  createdAt  DateTime @default(now())
+
+  @@unique([fromUserId, toUserId])
+  @@index([fromUserId, createdAt])
+  @@index([toUserId])
+}

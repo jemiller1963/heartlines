@@ -1,0 +1,16 @@
+// @polsia:user-owned — waitlist signup store for the public landing page.
+//
+// Anonymous (no `userId` / `User` link): the landing-page user is a visitor
+// not yet signed up, and the brief does not request one. We use a plain
+// scalar `email` + uniqueness instead of a lifted `@relation` to `User`.
+// No FK to `User` (auth.prisma is framework-owned and cannot host a
+// back-relation field anyway).
+
+model WaitlistSignup {
+  id        String   @id @default(cuid())
+  email     String
+  createdAt DateTime @default(now())
+
+  @@unique([email])
+  @@index([createdAt])
+}

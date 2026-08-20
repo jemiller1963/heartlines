@@ -1,0 +1,19 @@
+// @polsia:user-owned — per-user PrivacyPrefs model.
+//
+// Linked to better-auth's `User` by a SCALAR `userId` only (no Prisma
+// `@relation` back to `User`). `auth.prisma` is framework-owned and the
+// better-auth AGENT.md forbids editing it to add a back-relation field. The
+// row is read/written by id at the call site.
+//
+// The framework-owned `prisma/schema/_base.prisma` declares datasource +
+// generator — do NOT redeclare them here.
+
+model PrivacyPreferences {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  profilePublic    Boolean  @default(true)
+  hideLastActive   Boolean  @default(false)
+  hideReadReceipts Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}

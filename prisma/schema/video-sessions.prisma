@@ -1,0 +1,59 @@
+// @polsia:user-owned — VideoSession model for in-app video dates.
+//
+// Linked to better-auth's `User` by SCALAR `userAId` / `userBId` only (no
+// Prisma `@relation` back to `User`). `auth.prisma` is framework-owned and
+// the better-auth AGENT.md forbids editing it to add back-relation fields.
+//
+// Canonical-pair invariant — mirrors `MessageThread`: the SAME two users
+// always map to ONE `VideoSession` row (this slice only creates `PENDING`
+// rows; a future contributor that adds `ACTIVE`/`ENDED` writes must keep the
+// sort discipline — sort `[sessionId, toUserId]` before insert — so the
+// `@@unique([userAId, userBId])` index dedupes concurrent writes from
+// opposite sides, and a list-and-show endpoint that scans
+// `userAId = ? OR userBId = ?` never sees two rows for the same pair.
+//
+// `status` enum — `PENDING` = row created, neither party has joined;
+// `ACTIVE`  = at least one participant has connected (a future endpoint
+// writes `startAt`); `ENDED` = call window closed (a future endpoint writes
+// `endAt`); `CANCELLED` = pending invite was rescinded before either side
+// joined (PATCH `cancel` / `decline` write this; `startAt`/`endAt` STAY
+// null — distinct from `ENDED`, which writes `endAt`). This slice ONLY
+// creates `PENDING` rows; the model + enum are shaped so future transition
+// endpoints don't have to re-do the migration.
+//
+// `roomUrl` is an opaque server-generated token (`crypto.randomUUID()`
+// in the route handler). A future provider (Daily / Twilio / LiveKit) can
+// replace the generator and add a token-signing layer without touching
+// the contract surface.
+//
+// Datasource + generator live in `prisma/schema/_base.prisma` — do NOT
+// redeclare them here.
+
+enum VideoSessionStatus {
+  PENDING
+  ACTIVE
+  ENDED
+  CANCELLED
+}
+
+model VideoSession {
+  id        String            @id @default(cuid())
+  userAId   String
+  userBId   String
+  // The participant who CREATED this session. The canonical `[a,b].sort()`
+  // pair discipline destroys the original sender/recipient ordering, so
+  // without an explicit `senderId` the route handler can't tell who invited
+  // whom. Written by `POST /api/video-sessions`; consumed by the inbox page
+  // to derive the "Outgoing" vs "Incoming" direction chip.
+  senderId  String
+  status    VideoSessionStatus @default(PENDING)
+  roomUrl   String
+  startAt   DateTime?
+  endAt     DateTime?
+  createdAt DateTime          @default(now())
+
+  @@unique([userAId, userBId])
+  @@index([userAId, createdAt(sort: Desc)])
+  @@index([userBId, createdAt(sort: Desc)])
+  @@index([senderId])
+}

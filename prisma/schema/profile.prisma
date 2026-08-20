@@ -1,0 +1,70 @@
+// @polsia:user-owned — matching-feed Profile API.
+//
+// Linked to better-auth's `User` by a SCALAR `userId` only (no Prisma
+// `@relation` back to `User`). `auth.prisma` is framework-owned and the better-
+// auth AGENT.md forbids editing it to add a back-relation field. The Profile
+// row is read/written by id (`prisma.user.findUnique({ where: { id: userId } })`)
+// at the call site.
+//
+// The framework-owned `prisma/schema/_base.prisma` declares datasource +
+// generator — do NOT redeclare them here.
+
+enum VerificationStatus {
+  unverified
+  pending
+  approved
+  rejected
+}
+
+// Admin moderation state for the profile-review queue. New rows land in
+// `PENDING`; the future admin GET /api/admin/profiles and the page it powers
+// will flip rows to `APPROVED` or `FLAGGED`. Three values keep the enum
+// deliberately small — the road is "review queue → decision", not a state
+// machine with half a dozen transient statuses.
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  FLAGGED
+}
+
+model Profile {
+  id                String             @id @default(cuid())
+  userId            String             @unique
+  displayName       String?
+  age               Int
+  location          String
+  interests         String[]
+  lifestylePreferences String[]         @default([])
+  bio               String?
+  // Served same-origin from /public/uploads/<userId>.<ext>. Set/unset by POST
+  // and DELETE on /api/profile/avatar (owner-only).
+  avatarUrl         String?
+  // Owner-only ID verification state. Flipped to `pending` by POST on
+  // /api/profile/verification-id; admin review will set `approved`/`rejected`.
+  verificationStatus VerificationStatus? @default(unverified)
+  // Admin moderation state. Defaults to `PENDING` for every new Profile row so
+  // the review queue (`GET /api/admin/profiles`) sees it on first pass.
+  reviewStatus      ReviewStatus       @default(PENDING)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([location])
+  @@index([age])
+  @@index([reviewStatus, createdAt])
+}
+
+// One pending or reviewed ID-verification submission per user. Scalar `userId`
+// only — never `@relation` back to `User` (auth.prisma is framework-owned and
+// cannot host a back-relation). `@@map("id_verification")` so the physical
+// table name cannot collide with better-auth's `verification` email-token
+// table even if a future migration changes the spelling.
+model IdVerification {
+  id          String           @id @default(cuid())
+  userId      String           @unique
+  // Served same-origin from /public/uploads/verification/<userId>.<ext>.
+  imagePath   String
+  status      VerificationStatus
+  submittedAt DateTime         @default(now())
+
+  @@map("id_verification")
+}
