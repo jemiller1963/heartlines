@@ -1,12 +1,13 @@
+// @vitest-environment node
 // @polsia:user-owned — vitest for /api/discover/matches and DiscoverResult.
 //
-// // @vitest-environment node is required: vitest defaults to jsdom, which
+// @vitest-environment node is required: vitest defaults to jsdom, which
 // would rewrite import.meta.url and break server-only / Prisma resolution.
 // Neutralize server-only (`import 'server-only'` is a side-effect-only
 // module, so replacing it with an empty object is enough) and stub Prisma +
 // requireAuth so the handler runs against a fake DB.
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
@@ -16,10 +17,22 @@ const mocks = vi.hoisted(() => {
       findUnique: vi.fn(),
       findMany: vi.fn(),
     },
-    match: {
+    swipe: {
+      findMany: vi.fn(),
+    },
+    block: {
+      findMany: vi.fn(),
+    },
+    privacyPreferences: {
       findMany: vi.fn(),
     },
     discovery: {
+      findMany: vi.fn(),
+    },
+    connection: {
+      findMany: vi.fn(),
+    },
+    user: {
       findMany: vi.fn(),
     },
   };
@@ -43,13 +56,16 @@ describe('discover shared contract', () => {
       profile: {
         id: 'profile-1',
         userId: 'user-1',
-        age: 30,
+        age: 52,
         location: 'Paris',
         interests: ['hiking', 'cooking'],
+        lifestylePreferences: [],
         createdAt: NOW,
         updatedAt: NOW,
       },
+      name: 'Alice',
       score: 87,
+      sharedInterests: ['hiking'],
     });
     expect(result.success).toBe(true);
   });
@@ -61,34 +77,42 @@ describe('discover shared contract', () => {
       profile: {
         id: 'profile-1',
         userId: 'user-1',
-        age: 30,
+        age: 52,
         location: 'Paris',
         interests: ['hiking'],
+        lifestylePreferences: [],
         createdAt: NOW,
         updatedAt: NOW,
       },
+      name: 'Alice',
       score: 150,
+      sharedInterests: [],
     });
     expect(result.success).toBe(false);
   });
 
-  it('DiscoverResult accepts an empty matches list with null nextCursor', async () => {
+  it('DiscoverResult accepts a full valid payload', async () => {
     const { DiscoverResult } = await import('@/lib/contracts/discover');
-    expect(DiscoverResult.safeParse({ matches: [], nextCursor: null }).success).toBe(true);
+    expect(
+      DiscoverResult.safeParse({ matches: [], nextCursor: null, hasProfile: true }).success,
+    ).toBe(true);
   });
 
   it('DiscoverResult rejects a non-nullable nextCursor', async () => {
     const { DiscoverResult } = await import('@/lib/contracts/discover');
-    expect(DiscoverResult.safeParse({ matches: [], nextCursor: 42 }).success).toBe(false);
+    expect(
+      DiscoverResult.safeParse({ matches: [], nextCursor: 42, hasProfile: false }).success,
+    ).toBe(false);
   });
 
   it('DiscoverResult accepts an empty matches list and any ignored extras (zod 3 default)', async () => {
     const { DiscoverResult } = await import('@/lib/contracts/discover');
     // zod 3 z.object is passthrough-by-default: extras don't fail. Drift is
     // caught instead by the strict shape of the typed payload below.
-    expect(DiscoverResult.safeParse({ matches: [], nextCursor: null, foo: 'bar' }).success).toBe(
-      true,
-    );
+    expect(
+      DiscoverResult.safeParse({ matches: [], nextCursor: null, hasProfile: false, foo: 'bar' })
+        .success,
+    ).toBe(true);
   });
 
   it('DiscoverQuery accepts a missing cursor and a valid cuid', async () => {
@@ -109,32 +133,58 @@ const VIEWER_USER = 'viewer-user';
 const VIEWER_PROFILE = {
   id: `c${'v'.repeat(24)}`,
   userId: VIEWER_USER,
-  age: 30,
+  age: 52,
   location: 'Paris',
   interests: ['hiking', 'cooking', 'jazz'],
+  lifestylePreferences: [],
   bio: null,
   avatarUrl: null,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 };
 
-function authed() {
-  mocks.requireAuth.mockResolvedValue({ id: VIEWER_USER, email: 'v@x' });
+function eligibleProfileRow(idSuffix: string, userId: string) {
+  return {
+    id: `c${idSuffix.padStart(24, '0')}`,
+    userId,
+    age: 52,
+    location: 'Paris',
+    interests: ['hiking'],
+    lifestylePreferences: [],
+    bio: null,
+    avatarUrl: null,
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+  };
 }
 
-function p2021() {
-  // The handler duck-types Prisma's error code, so a plain object with `.code`
-  // is enough — keeps `@prisma/client` out of the test file's imports.
-  return Object.assign(new Error('relation does not exist'), { code: 'P2021' });
+function authed() {
+  mocks.requireAuth.mockResolvedValue({ id: VIEWER_USER, email: 'v@x' });
 }
 
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.prisma.profile.findUnique.mockReset();
   mocks.prisma.profile.findMany.mockReset();
-  mocks.prisma.match.findMany.mockReset();
+  mocks.prisma.swipe.findMany.mockReset();
+  mocks.prisma.block.findMany.mockReset();
+  mocks.prisma.privacyPreferences.findMany.mockReset();
   mocks.prisma.discovery.findMany.mockReset();
+  mocks.prisma.connection.findMany.mockReset();
+  mocks.prisma.user.findMany.mockReset();
   mocks.requireAuth.mockReset();
+
+  // Safe defaults: no swiped, no blocks, no privacy restrictions, no recently seen, no user names
+  mocks.prisma.swipe.findMany.mockResolvedValue([]);
+  mocks.prisma.block.findMany.mockResolvedValue([]);
+  mocks.prisma.privacyPreferences.findMany.mockResolvedValue([]);
+  mocks.prisma.discovery.findMany.mockResolvedValue([]);
+  mocks.prisma.connection.findMany.mockResolvedValue([]);
+  mocks.prisma.user.findMany.mockResolvedValue([]);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 const getRoute = () => import('@/app/api/discover/matches/route');
@@ -164,19 +214,23 @@ describe('discover route — auth + empty branches', () => {
     const { GET } = await getRoute();
     const res = await GET(new Request('http://test/api/discover/matches'));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ matches: [], nextCursor: null });
+    expect(await res.json()).toEqual({ matches: [], nextCursor: null, hasProfile: false });
   });
 
   it('returns 200 with an empty list when no candidates match', async () => {
     authed();
     mocks.prisma.profile.findUnique.mockResolvedValue(VIEWER_PROFILE);
-    mocks.prisma.match.findMany.mockResolvedValue([]);
-    mocks.prisma.discovery.findMany.mockResolvedValue([]);
-    mocks.prisma.profile.findMany.mockResolvedValue([]);
+    const captured = vi.fn().mockResolvedValue([]);
+    mocks.prisma.profile.findMany.mockImplementation(captured);
     const { GET } = await getRoute();
     const res = await GET(new Request('http://test/api/discover/matches'));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ matches: [], nextCursor: null });
+    expect(await res.json()).toEqual({ matches: [], nextCursor: null, hasProfile: true });
+    const args = captured.mock.calls[0]?.[0];
+    expect(args?.where?.age).toEqual({ gte: 50 });
+    expect(args?.where?.reviewStatus).toBe('APPROVED');
+    expect(args?.orderBy).toEqual({ id: 'asc' });
+    expect(args?.take).toBe(40);
   });
 });
 
@@ -191,6 +245,7 @@ describe('discover route — scored ordering', () => {
       age,
       location,
       interests,
+      lifestylePreferences: [],
       bio: null,
       avatarUrl: null,
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -201,14 +256,12 @@ describe('discover route — scored ordering', () => {
   it('orders matches by score DESC with id ASC tie-break', async () => {
     authed();
     mocks.prisma.profile.findUnique.mockResolvedValue(VIEWER_PROFILE);
-    mocks.prisma.match.findMany.mockResolvedValue([]);
-    mocks.prisma.discovery.findMany.mockResolvedValue([]);
     // Returned in id ASC order: AAA (high id), BBB (low id = wins tie-break),
-    // CCC (zero score).
+    // CCC (zero score — age 82 gives 30yr gap, Lyon, paragliding).
     mocks.prisma.profile.findMany.mockResolvedValue([
-      candidateRow('aaa', 30, 'Paris', ['hiking', 'cooking', 'jazz']),
-      candidateRow('bbb', 30, 'Paris', ['hiking', 'cooking', 'jazz']),
-      candidateRow('ccc', 60, 'Lyon', ['paragliding']),
+      candidateRow('aaa', 52, 'Paris', ['hiking', 'cooking', 'jazz']),
+      candidateRow('bbb', 52, 'Paris', ['hiking', 'cooking', 'jazz']),
+      candidateRow('ccc', 82, 'Lyon', ['paragliding']),
     ]);
 
     const { GET } = await getRoute();
@@ -230,12 +283,13 @@ describe('discover route — scored ordering', () => {
     expect(body.nextCursor).toBeNull(); // 3 < PAGE_SIZE
   });
 
-  it('excludes self + mutual match partners + recently-seen candidates', async () => {
+  it('excludes self + swiped + recently-seen candidates', async () => {
+    const now = new Date('2026-08-26T12:00:00.000Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
     authed();
     mocks.prisma.profile.findUnique.mockResolvedValue(VIEWER_PROFILE);
-    mocks.prisma.match.findMany.mockResolvedValue([
-      { userAId: VIEWER_USER, userBId: 'user-mutual' },
-    ]);
+    mocks.prisma.swipe.findMany.mockResolvedValue([{ toUserId: 'user-mutual' }]);
     mocks.prisma.discovery.findMany.mockResolvedValue([{ targetUserId: 'user-seen' }]);
 
     const captured = vi.fn();
@@ -246,9 +300,10 @@ describe('discover route — scored ordering', () => {
         {
           id: `c${'x'.repeat(24)}`,
           userId: 'user-keep',
-          age: 30,
+          age: 52,
           location: 'Paris',
           interests: ['hiking'],
+          lifestylePreferences: [],
           bio: null,
           avatarUrl: null,
           createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -261,8 +316,47 @@ describe('discover route — scored ordering', () => {
     const res = await GET(new Request('http://test/api/discover/matches'));
     expect(res.status).toBe(200);
     const exclude = captured.mock.calls[0]?.[0]?.where?.userId?.notIn ?? [];
-    // viewer themselves + mutual partner + recently-seen target
+    // viewer themselves + swiped user + recently-seen target
     expect(exclude).toEqual(expect.arrayContaining([VIEWER_USER, 'user-mutual', 'user-seen']));
+    const discoveryWhere = mocks.prisma.discovery.findMany.mock.calls[0]?.[0]?.where;
+    expect(discoveryWhere?.viewerUserId).toBe(VIEWER_USER);
+    expect(discoveryWhere?.status).toBe('seen');
+    expect(discoveryWhere?.seenAt?.gte).toEqual(
+      new Date(now.getTime() - 30 * 86_400_000),
+    );
+  });
+
+  it('excludes an outgoing Connection even when no Swipe exists', async () => {
+    authed();
+    mocks.prisma.profile.findUnique.mockResolvedValue(VIEWER_PROFILE);
+    mocks.prisma.swipe.findMany.mockResolvedValue([]);
+    mocks.prisma.connection.findMany.mockResolvedValue([{ toUserId: 'user-connected' }]);
+
+    const captured = vi.fn();
+    const connected = eligibleProfileRow('connected', 'user-connected');
+    const clean = eligibleProfileRow('clean', 'user-clean');
+    mocks.prisma.profile.findMany.mockImplementation((args) => {
+      captured(args);
+      const notIn: string[] = args?.where?.userId?.notIn ?? [];
+      return Promise.resolve([connected, clean].filter((row) => !notIn.includes(row.userId)));
+    });
+
+    const { GET } = await getRoute();
+    const res = await GET(new Request('http://test/api/discover/matches'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const userIds = body.matches.map((m: { profile: { userId: string } }) => m.profile.userId);
+    expect(userIds).toEqual(['user-clean']);
+    expect(mocks.prisma.swipe.findMany).toHaveBeenCalledWith({
+      where: { fromUserId: VIEWER_USER },
+      select: { toUserId: true },
+    });
+    expect(mocks.prisma.connection.findMany).toHaveBeenCalledWith({
+      where: { fromUserId: VIEWER_USER },
+      select: { toUserId: true },
+    });
+    const notIn: string[] = captured.mock.calls[0]?.[0]?.where?.userId?.notIn ?? [];
+    expect(notIn).toContain('user-connected');
   });
 });
 
@@ -271,9 +365,10 @@ describe('discover route — cursor advance', () => {
     return {
       id: `c${idSuffix.padStart(24, '0')}`,
       userId: `user-${idSuffix}`,
-      age: 30,
+      age: 52,
       location: 'Paris',
       interests: ['hiking', 'cooking', 'jazz'],
+      lifestylePreferences: [],
       bio: null,
       avatarUrl: null,
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -284,8 +379,6 @@ describe('discover route — cursor advance', () => {
   it('first call returns nextCursor = last id when page is full (PAGE_SIZE = 10)', async () => {
     authed();
     mocks.prisma.profile.findUnique.mockResolvedValue(VIEWER_PROFILE);
-    mocks.prisma.match.findMany.mockResolvedValue([]);
-    mocks.prisma.discovery.findMany.mockResolvedValue([]);
 
     const rows = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10'].map((s) => row(s));
     mocks.prisma.profile.findMany.mockResolvedValue(rows);
@@ -301,8 +394,6 @@ describe('discover route — cursor advance', () => {
   it('second call with cursor advances; smaller next page returns nextCursor = null', async () => {
     authed();
     mocks.prisma.profile.findUnique.mockResolvedValue(VIEWER_PROFILE);
-    mocks.prisma.match.findMany.mockResolvedValue([]);
-    mocks.prisma.discovery.findMany.mockResolvedValue([]);
 
     const cursorId = `c${'10'.padStart(24, '0')}`;
     // Caller passes cursor=...c10... — the handler relays it to findMany.
@@ -320,31 +411,5 @@ describe('discover route — cursor advance', () => {
     expect(body.nextCursor).toBeNull(); // 3 < PAGE_SIZE
     // Cursor is forwarded to the findMany where clause.
     expect(captured.mock.calls[0]?.[0]?.where?.id).toEqual({ gt: cursorId });
-  });
-});
-
-describe('discover route — optional Match / Discovery tables', () => {
-  it('tolerates Match + Discovery tables being absent (P2021)', async () => {
-    authed();
-    mocks.prisma.profile.findUnique.mockResolvedValue(VIEWER_PROFILE);
-    mocks.prisma.match.findMany.mockRejectedValue(p2021());
-    mocks.prisma.discovery.findMany.mockRejectedValue(p2021());
-    mocks.prisma.profile.findMany.mockResolvedValue([]);
-
-    const { GET } = await getRoute();
-    const res = await GET(new Request('http://test/api/discover/matches'));
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ matches: [], nextCursor: null });
-  });
-
-  it('returns 500 for a non-P2021 error from Match lookup', async () => {
-    authed();
-    mocks.prisma.profile.findUnique.mockResolvedValue(VIEWER_PROFILE);
-    mocks.prisma.match.findMany.mockRejectedValue(new Error('boom'));
-    mocks.prisma.discovery.findMany.mockResolvedValue([]);
-
-    const { GET } = await getRoute();
-    const res = await GET(new Request('http://test/api/discover/matches'));
-    expect(res.status).toBe(500);
   });
 });

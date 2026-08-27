@@ -322,7 +322,7 @@ export function ProfileEditForm() {
                       <Input
                         type="number"
                         inputMode="numeric"
-                        min={18}
+                        min={50}
                         max={120}
                         value={
                           Number.isFinite(field.value ?? Number.NaN) ? String(field.value) : ''
@@ -333,6 +333,7 @@ export function ProfileEditForm() {
                         }}
                       />
                     </FormControl>
+                    <FormDescription>Heart Lines is for people 50 and older.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

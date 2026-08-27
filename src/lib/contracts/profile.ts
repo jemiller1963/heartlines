@@ -10,7 +10,7 @@ export const ProfileCreate = z.object({
   age: z
     .number()
     .int('Age must be a whole number')
-    .min(18, 'You must be 18 or older')
+    .min(50, 'Heart Lines is a 50+ community')
     .max(120, 'Age is out of range'),
   location: z
     .string()

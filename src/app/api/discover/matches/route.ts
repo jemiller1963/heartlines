@@ -1,14 +1,15 @@
 // @polsia:user-owned — matching-feed Discover API: ranked potential matches.
 //
 // requireAuth gates access. Returns one page of scored profiles, excluding
-// the viewer, anyone they've already swiped on, and anyone whose Discovery
-// row marks them as 'seen' within the last 30 days. Score uses
-// scoreMatch(viewer, candidate). Cursor = last profile.id; ordering = score
-// DESC, profile.id ASC for stable pagination. Empty result returns 200 with
-// { matches: [], nextCursor: null } — never 404.
+// the viewer and the canonical discovery candidate pool's hard exclusions
+// (safety blocks/privacy, Swipes, recent 'seen' rows, and outgoing
+// Connections). Score uses scoreMatch(viewer, candidate). Cursor = last
+// profile.id; ordering = score DESC, profile.id ASC for stable pagination.
+// Empty result returns 200 with { matches: [], nextCursor: null } — never 404.
 
 import 'server-only';
 import { NextResponse } from 'next/server';
+import { getEligibleDiscoveryCandidates } from '@/lib/business/discovery-candidates';
 import { interestOverlap } from '@/lib/business/matching';
 import { type DiscoverMatchItem, DiscoverQuery, DiscoverResult } from '@/lib/contracts/discover';
 import { ProfileItem } from '@/lib/contracts/profile';
@@ -20,7 +21,6 @@ export const dynamic = 'force-dynamic';
 
 const PAGE_SIZE = 10;
 const CANDIDATE_FETCH = PAGE_SIZE * 4;
-const SEEN_WINDOW_MS = 30 * 86_400_000;
 
 function profileShape(row: {
   id: string;
@@ -28,6 +28,7 @@ function profileShape(row: {
   age: number;
   location: string;
   interests: string[];
+  lifestylePreferences: string[];
   bio: string | null;
   avatarUrl: string | null;
   createdAt: Date;
@@ -39,6 +40,7 @@ function profileShape(row: {
     age: row.age,
     location: row.location,
     interests: row.interests,
+    lifestylePreferences: row.lifestylePreferences,
     bio: row.bio ?? undefined,
     avatarUrl: row.avatarUrl ?? null,
     createdAt: row.createdAt.toISOString(),
@@ -70,35 +72,10 @@ export async function GET(req: Request) {
     );
   }
 
-  const exclude = new Set<string>([auth.session.id]);
-
-  // Already-swiped filter — mirror /api/feed (so the discover queue doesn't
-  // re-show what the user has already swiped on).
-  const swiped = await prisma.swipe.findMany({
-    where: { fromUserId: auth.session.id },
-    select: { toUserId: true },
-  });
-  for (const row of swiped) exclude.add(row.toUserId);
-
-  // Discovery 'seen' filter — "Recently seen" = seenAt within the last 30
-  // days; ancient 'seen' rows re-qualify candidates so the queue keeps moving.
-  const recentlySeen = await prisma.discovery.findMany({
-    where: {
-      viewerUserId: auth.session.id,
-      status: 'seen',
-      seenAt: { gte: new Date(Date.now() - SEEN_WINDOW_MS) },
-    },
-    select: { targetUserId: true },
-  });
-  for (const row of recentlySeen) exclude.add(row.targetUserId);
-
-  const candidates = await prisma.profile.findMany({
-    where: {
-      id: query.data.cursor ? { gt: query.data.cursor } : undefined,
-      userId: { notIn: [...exclude] },
-    },
-    orderBy: { id: 'asc' },
-    take: CANDIDATE_FETCH,
+  const candidates = await getEligibleDiscoveryCandidates({
+    viewerUserId: auth.session.id,
+    cursor: query.data.cursor,
+    limit: CANDIDATE_FETCH,
   });
 
   // Batch read of `User.name` for every candidate in one go — never expose
