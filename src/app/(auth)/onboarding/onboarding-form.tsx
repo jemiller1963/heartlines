@@ -213,7 +213,7 @@ export function OnboardingForm() {
                         <Input
                           type="number"
                           inputMode="numeric"
-                          min={18}
+                          min={50}
                           max={120}
                           value={Number.isFinite(field.value) ? String(field.value) : ''}
                           onChange={(e) => {
@@ -222,6 +222,7 @@ export function OnboardingForm() {
                           }}
                         />
                       </FormControl>
+                      <FormDescription>Heart Lines is for people 50 and older.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
