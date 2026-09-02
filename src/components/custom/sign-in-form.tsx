@@ -6,7 +6,9 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { apiFetch } from '@/lib/api-client';
 import { signIn } from '@/lib/auth-client';
+import { MemberEntryResponse } from '@/lib/contracts/member-entry';
 
 // Email + password sign-in. Composes the template's base shadcn primitives
 // (Button/Input/Label) styled through the theme tokens. Restyle freely — this
@@ -58,7 +60,8 @@ export function SignInForm() {
         setError(signInError.message ?? 'Could not sign in. Check your details.');
         return;
       }
-      window.location.assign('/');
+      const entry = await apiFetch('/api/member-entry', { schema: MemberEntryResponse });
+      window.location.assign(entry.destination);
     } catch (err) {
       const aborted = isAbortError(err) || controller.signal.aborted;
       const message = aborted ? "Sign-in didn't complete. Please try again." : getErrorMessage(err);

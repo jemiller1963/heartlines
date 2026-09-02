@@ -1,5 +1,5 @@
-// @polsia:user-owned — worked client data-plane example. Copy the shape for a
-// real resource, then delete this page.
+// @polsia:user-owned — worked client data-plane example.
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,13 +21,11 @@ import { apiFetch } from '@/lib/api-client';
 import { ExampleCreate, ExampleItem, ExampleList } from '@/lib/contracts/example';
 import { applyServerErrors } from '@/lib/forms';
 
-// The form submits the write shape; the list stores the persisted read shape.
 type ExampleFormValues = ExampleCreate;
 
 export default function ExamplePage() {
   const [items, setItems] = useState<ExampleItem[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
-
   const form = useForm<ExampleFormValues>({
     resolver: zodResolver(ExampleCreate),
     defaultValues: { name: '' },
@@ -37,14 +35,10 @@ export default function ExamplePage() {
     let active = true;
     apiFetch('/api/example', { schema: ExampleList })
       .then((data) => {
-        if (active) {
-          setItems(data.items);
-        }
+        if (active) setItems(data.items);
       })
       .catch(() => {
-        if (active) {
-          setLoadError('Could not load examples.');
-        }
+        if (active) setLoadError('Could not load examples.');
       });
     return () => {
       active = false;
@@ -62,11 +56,8 @@ export default function ExamplePage() {
       form.reset({ name: '' });
       toast.success(`Added “${created.name}”.`);
     } catch (err) {
-      // Field-level server validation stays inline; generic failures go to toast.
       const applied = err instanceof Error && applyServerErrors(err.cause, form.setError);
-      if (!applied) {
-        toast.error('Something went wrong. Please try again.');
-      }
+      if (!applied) toast.error('Something went wrong. Please try again.');
     }
   });
 
@@ -98,7 +89,6 @@ export default function ExamplePage() {
               </Button>
             </form>
           </Form>
-
           <div className="flex flex-col gap-2">
             {loadError ? (
               <p className="text-sm text-destructive">{loadError}</p>

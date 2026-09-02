@@ -32,9 +32,5 @@ export const navItems: NavItem[] = [
   { label: 'How It Works', href: '/#how-it-works', group: 'primary', order: 1 },
   { label: 'Features', href: '/#features', group: 'primary', order: 2 },
   { label: 'Pricing', href: '/pricing', group: 'primary', order: 3 },
-  { label: 'Profile', href: '/profile', group: 'primary', order: 4, requiresAuth: true },
-  { label: 'Feed', href: '/feed', group: 'primary', order: 5, requiresAuth: true },
-  { label: 'Privacy', href: '/settings/privacy', group: 'primary', order: 6, requiresAuth: true },
-  { label: 'Blocked', href: '/settings/blocks', group: 'primary', order: 7, requiresAuth: true },
   { label: 'Join Heart Lines', href: '/#join', group: 'secondary', order: 0 },
 ];

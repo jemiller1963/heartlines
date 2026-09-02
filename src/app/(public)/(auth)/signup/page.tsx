@@ -1,4 +1,4 @@
-// @polsia:user-owned — seeded by polsia/modules/better-auth; restyle freely.
+// @polsia:user-owned — signup page.
 
 import { SignUpForm } from '@/components/custom/sign-up-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +10,6 @@ export default function SignupPage() {
         <div className="absolute top-[-30%] left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full bg-[var(--brand-100)] opacity-40 blur-3xl" />
         <div className="absolute bottom-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-[var(--brand-200)] opacity-30 blur-3xl" />
       </div>
-
       <Card className="relative w-full max-w-md shadow-brand border border-border/60 bg-card/95 backdrop-blur-sm">
         <CardHeader className="text-center pb-2">
           <CardTitle className="text-h4">Create an account</CardTitle>

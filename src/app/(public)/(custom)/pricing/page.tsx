@@ -1,8 +1,4 @@
-// @polsia:user-owned — `/pricing` tier landing page. Server Component
-// exporting `metadata` (good for SEO) and composing the `<PricingCard />`
-// client island. The page renders the single Heart Lines Premium tier and
-// is reachable from `/` via the "Pricing" entry that SiteNav renders when
-// the visitor is signed in.
+// @polsia:user-owned — /pricing tier landing page.
 
 import { Heart, ShieldCheck } from 'lucide-react';
 import type { Metadata } from 'next';
@@ -41,7 +37,6 @@ export default function PricingPage() {
       <section className="pb-section">
         <div className="container-page mx-auto flex flex-col items-stretch gap-6 md:flex-row md:items-center md:justify-center">
           <PricingCard />
-
           <aside className="flex max-w-sm flex-col gap-3 rounded-2xl border border-border/70 bg-card p-6 text-body text-muted-foreground shadow-sm">
             <p className="flex items-center gap-2 text-eyebrow text-foreground">
               <ShieldCheck aria-hidden="true" className="size-4 text-brand-500" />
