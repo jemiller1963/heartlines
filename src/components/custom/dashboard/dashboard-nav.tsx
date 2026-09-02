@@ -5,8 +5,9 @@ import {
   Ban,
   CalendarDays,
   CreditCard,
+  Heart,
   IdCard,
-  LayoutDashboard,
+  type LucideIcon,
   Mail,
   ShieldCheck,
   User,
@@ -19,82 +20,72 @@ import { useMountedSession } from '@/lib/use-auth-session';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
-  href: (session: { id: string } | null) => string;
+  href: string;
   label: string;
-  icon: typeof LayoutDashboard;
+  icon: LucideIcon;
   match: 'exact' | 'starts';
-  adminOnly?: boolean;
 }
 
-const navItems: NavItem[] = [
+const primaryItems: NavItem[] = [
+  { href: '/feed', label: 'Matches', icon: Heart, match: 'starts' },
+  { href: '/messages', label: 'Messages', icon: Mail, match: 'starts' },
+  { href: '/events', label: 'Events', icon: CalendarDays, match: 'starts' },
+  { href: '/profile', label: 'Profile', icon: User, match: 'starts' },
+];
+
+const secondaryItems: NavItem[] = [
   {
-    href: () => '/dashboard',
-    label: 'Overview',
-    icon: LayoutDashboard,
-    match: 'exact',
-  },
-  {
-    href: (session) => (session ? `/profile/${session.id}` : '/profile'),
-    label: 'Profile',
-    icon: User,
-    match: 'starts',
-  },
-  {
-    href: () => '/events',
-    label: 'Events',
-    icon: CalendarDays,
-    match: 'exact',
-  },
-  {
-    href: () => '/video-sessions',
-    label: 'Video dates',
+    href: '/video-sessions',
+    label: 'Video Dates',
     icon: Video,
     match: 'starts',
   },
+  { href: '/profile/edit', label: 'Edit profile', icon: User, match: 'starts' },
   {
-    href: () => '/messages',
-    label: 'Messages',
-    icon: Mail,
-    match: 'starts',
-  },
-  {
-    href: () => '/settings/privacy',
+    href: '/settings/privacy',
     label: 'Privacy',
     icon: ShieldCheck,
     match: 'starts',
   },
   {
-    href: () => '/settings/blocks',
-    label: 'Blocked',
+    href: '/settings/blocks',
+    label: 'Blocked members',
     icon: Ban,
     match: 'starts',
   },
   {
-    href: () => '/pricing',
-    label: 'Pricing',
+    href: '/pricing',
+    label: 'Subscription / Pricing',
     icon: CreditCard,
     match: 'exact',
   },
+  { href: '/settings/account', label: 'Account', icon: User, match: 'starts' },
   {
-    href: () => '/admin/verifications',
+    href: '/support',
+    label: 'Safety & Support',
+    icon: ShieldCheck,
+    match: 'exact',
+  },
+];
+
+const adminItems: NavItem[] = [
+  {
+    href: '/admin/profiles',
+    label: 'Profile review',
+    icon: ShieldCheck,
+    match: 'starts',
+  },
+  {
+    href: '/admin/verifications',
     label: 'ID Review',
     icon: IdCard,
     match: 'starts',
-    adminOnly: true,
   },
   {
-    href: () => '/admin/profiles',
-    label: 'Profiles',
-    icon: ShieldCheck,
-    match: 'starts',
-    adminOnly: true,
-  },
-  {
-    href: () => '/admin/users',
+    href: '/admin/users',
     label: 'Users',
     icon: Users,
     match: 'starts',
-    adminOnly: true,
   },
 ];
 
@@ -112,36 +103,50 @@ export function DashboardNav() {
   const { data: session } = useMountedSession();
   const isAdmin = hasRole(session?.user?.role, 'admin');
 
-  return (
-    <nav
-      aria-label="Dashboard"
-      className="flex gap-2 overflow-x-auto pb-1 lg:grid lg:overflow-visible lg:pb-0"
-    >
-      {navItems
-        .filter((item) => !item.adminOnly || isAdmin)
-        .map((item) => {
-          const Icon = item.icon;
-          const linkHref = item.href(session?.user ?? null);
-          const active =
-            item.match === 'starts' ? pathname.startsWith(linkHref) : pathname === linkHref;
+  const renderItem = (item: NavItem) => {
+    const Icon = item.icon;
+    const active =
+      item.match === 'starts'
+        ? pathname === item.href || pathname.startsWith(`${item.href}/`)
+        : pathname === item.href;
 
-          return (
-            <Link
-              key={item.label}
-              href={linkHref}
-              aria-current={active ? 'page' : undefined}
-              className={cn(
-                'flex h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors',
-                active
-                  ? 'bg-secondary text-secondary-foreground'
-                  : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground',
-              )}
-            >
-              <Icon aria-hidden="true" className="size-4" />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        aria-current={active ? 'page' : undefined}
+        className={cn(
+          'flex h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors',
+          active
+            ? 'bg-secondary text-secondary-foreground'
+            : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground',
+        )}
+      >
+        <Icon aria-hidden="true" className="size-4" />
+        <span>{item.label}</span>
+      </Link>
+    );
+  };
+
+  return (
+    <nav aria-label="Member navigation" className="flex flex-col gap-6">
+      <div className="flex gap-2 overflow-x-auto lg:grid lg:overflow-visible">
+        {primaryItems.map(renderItem)}
+      </div>
+      <div className="flex flex-col gap-1 border-t border-border/70 pt-4">
+        <p className="px-3 pb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          More
+        </p>
+        {secondaryItems.map(renderItem)}
+      </div>
+      {isAdmin && (
+        <div className="flex flex-col gap-1 border-t border-border/70 pt-4">
+          <p className="px-3 pb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Admin
+          </p>
+          {adminItems.map(renderItem)}
+        </div>
+      )}
     </nav>
   );
 }

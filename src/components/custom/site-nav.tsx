@@ -48,7 +48,11 @@ const MAX_PRIMARY_SLOTS = 5;
 
 type NavSlot =
   | { readonly type: 'link'; readonly item: NavItem }
-  | { readonly type: 'menu'; readonly label: string; readonly items: readonly NavItem[] };
+  | {
+      readonly type: 'menu';
+      readonly label: string;
+      readonly items: readonly NavItem[];
+    };
 
 const itemOrder = (i: NavItem) => i.order ?? Number.MAX_SAFE_INTEGER;
 const slotOrder = (s: NavSlot) =>
@@ -80,7 +84,10 @@ function buildPrimarySlots(items: readonly NavItem[]): NavSlot[] {
 }
 
 // At most MAX_PRIMARY_SLOTS triggers render; the rest collapse into "More".
-function splitPrimarySlots(slots: NavSlot[]): { inline: NavSlot[]; overflow: NavSlot[] } {
+function splitPrimarySlots(slots: NavSlot[]): {
+  inline: NavSlot[];
+  overflow: NavSlot[];
+} {
   if (slots.length <= MAX_PRIMARY_SLOTS) return { inline: slots, overflow: [] };
   return {
     inline: slots.slice(0, MAX_PRIMARY_SLOTS - 1),
@@ -88,8 +95,13 @@ function splitPrimarySlots(slots: NavSlot[]): { inline: NavSlot[]; overflow: Nav
   };
 }
 
-export function SiteNav() {
+export function SiteNav({ enabled = false }: { enabled?: boolean }) {
+  const pathname = usePathname();
   const isAuthenticated = useIsAuthenticated();
+  const [open, setOpen] = React.useState(false);
+
+  if (!enabled) return null;
+
   // The brand links home, so drop a redundant '/' item from the rendered links.
   const primary = visibleItems('primary', isAuthenticated).filter((item) => item.href !== '/');
   const secondary = visibleItems('secondary', isAuthenticated);
@@ -101,9 +113,6 @@ export function SiteNav() {
 
   // Controlled so a drawer link both navigates AND dismisses the overlay; without
   // this the Sheet stays open over the new route after client-side navigation.
-  const [open, setOpen] = React.useState(false);
-
-  const pathname = usePathname();
   // Exact match for the root; segment-boundary match for everything else so
   // '/blog' highlights on '/blog/post' but '/' never matches every route.
   const isActive = (href: string) =>
@@ -329,8 +338,11 @@ export function SiteNav() {
   );
 }
 
-export function SiteFooter() {
+export function SiteFooter({ enabled = false }: { enabled?: boolean }) {
+  const _pathname = usePathname();
   const isAuthenticated = useIsAuthenticated();
+  if (!enabled) return null;
+
   const footer = visibleItems('footer', isAuthenticated);
   if (footer.length === 0) return null;
 

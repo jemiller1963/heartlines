@@ -30,8 +30,8 @@ export default function HomePage() {
             Be the first to hear when we open
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-body-lg text-muted-foreground">
-            Join the Heart Lines waitlist and we'll let you know as soon as sign-ups open in your
-            area.
+            Join the Heart Lines waitlist and we&apos;ll let you know as soon as sign-ups open in
+            your area.
           </p>
           <div className="mt-8">
             <WaitlistSignupForm />
