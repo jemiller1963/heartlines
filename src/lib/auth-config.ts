@@ -44,6 +44,8 @@ const adminPromotion = {
 export const authConfig: BetterAuthOptions = {
   emailAndPassword: {
     enabled: true,
+    minPasswordLength: 8,
+    maxPasswordLength: 128,
     // better-auth fires this once for a valid email and passes a fully-formed URL
     // (`${BETTER_AUTH_URL}/reset-password/${token}?callbackURL=${redirectTo}`).
     // We embed `url` verbatim and escape anything user-derived. The .catch swallows
