@@ -5,6 +5,10 @@
 // client can branch cleanly on "edit your profile first". 400/404/409 produce
 // the flat `{ errors: { field: msg } }` shape that `applyServerErrors`
 // understands.
+//
+// lifestylePreferences and lifestyleCharacteristics are a compatibility
+// bridge, not two matching dimensions: each field is read and written in its
+// own column, with no implicit translation or scoring in this owner API.
 
 import 'server-only';
 import { NextResponse } from 'next/server';
@@ -22,6 +26,11 @@ function profileShape(row: {
   location: string;
   interests: string[];
   lifestylePreferences: string[];
+  relationshipIntent?: string | null;
+  distancePreference?: string | null;
+  lifestyleCharacteristics?: string[];
+  valuesPriorities?: string[];
+  partnerPreferences?: string[];
   bio: string | null;
   avatarUrl: string | null;
   verificationStatus: 'unverified' | 'pending' | 'approved' | 'rejected' | null;
@@ -36,6 +45,11 @@ function profileShape(row: {
     location: row.location,
     interests: row.interests,
     lifestylePreferences: row.lifestylePreferences,
+    relationshipIntent: row.relationshipIntent ?? null,
+    distancePreference: row.distancePreference ?? null,
+    lifestyleCharacteristics: row.lifestyleCharacteristics ?? [],
+    valuesPriorities: row.valuesPriorities ?? [],
+    partnerPreferences: row.partnerPreferences ?? [],
     bio: row.bio ?? undefined,
     avatarUrl: row.avatarUrl ?? null,
     verificationStatus: row.verificationStatus ?? null,
@@ -95,6 +109,11 @@ export async function POST(req: Request) {
       location: parsed.data.location,
       interests: parsed.data.interests,
       lifestylePreferences: parsed.data.lifestylePreferences ?? [],
+      relationshipIntent: parsed.data.relationshipIntent ?? null,
+      distancePreference: parsed.data.distancePreference ?? null,
+      lifestyleCharacteristics: parsed.data.lifestyleCharacteristics ?? [],
+      valuesPriorities: parsed.data.valuesPriorities ?? [],
+      partnerPreferences: parsed.data.partnerPreferences ?? [],
       bio: parsed.data.bio ?? null,
     },
   });
@@ -120,7 +139,19 @@ export async function PATCH(req: Request) {
     );
   }
 
-  const { displayName, age, location, interests, lifestylePreferences, bio } = parsed.data;
+  const {
+    displayName,
+    age,
+    location,
+    interests,
+    lifestylePreferences,
+    relationshipIntent,
+    distancePreference,
+    lifestyleCharacteristics,
+    valuesPriorities,
+    partnerPreferences,
+    bio,
+  } = parsed.data;
   const updated = await prisma.profile.update({
     where: { userId: auth.session.id },
     data: {
@@ -129,6 +160,11 @@ export async function PATCH(req: Request) {
       ...(location !== undefined ? { location } : {}),
       ...(interests !== undefined ? { interests } : {}),
       ...(lifestylePreferences !== undefined ? { lifestylePreferences } : {}),
+      ...(relationshipIntent !== undefined ? { relationshipIntent } : {}),
+      ...(distancePreference !== undefined ? { distancePreference } : {}),
+      ...(lifestyleCharacteristics !== undefined ? { lifestyleCharacteristics } : {}),
+      ...(valuesPriorities !== undefined ? { valuesPriorities } : {}),
+      ...(partnerPreferences !== undefined ? { partnerPreferences } : {}),
       ...(bio !== undefined ? { bio } : {}),
     },
   });

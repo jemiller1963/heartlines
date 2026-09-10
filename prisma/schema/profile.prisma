@@ -34,7 +34,17 @@ model Profile {
   age               Int
   location          String
   interests         String[]
+  // Legacy compatibility field for free-form self-description and preference
+  // tags. Preserve it independently; it is not a second matching signal.
   lifestylePreferences String[]         @default([])
+  // Canonical structured lifestyle taxonomy for future approved structured work.
+  // It is additive with a safe default: never backfill or translate arbitrary
+  // legacy lifestylePreferences strings into this closed vocabulary here.
+  relationshipIntent String?
+  distancePreference String?
+  lifestyleCharacteristics String[]     @default([])
+  valuesPriorities  String[]            @default([])
+  partnerPreferences String[]           @default([])
   bio               String?
   // Served same-origin from /public/uploads/<userId>.<ext>. Set/unset by POST
   // and DELETE on /api/profile/avatar (owner-only).
