@@ -2,11 +2,11 @@
 // resource. Client-importable (zod only — no server-only imports).
 
 import { z } from 'zod';
-import { ProfileItem } from './profile';
+import { ProfilePublicItem } from './profile-public';
 import { UserId } from './swipe';
 
 export const DiscoverMatchItem = z.object({
-  profile: ProfileItem,
+  profile: ProfilePublicItem,
   // Better-auth `User.name` for the candidate — read on the server, supplied
   // in the payload. May be empty; the UI shows a deterministic fallback.
   name: z.string(),

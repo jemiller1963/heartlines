@@ -136,6 +136,30 @@ describe('/api/profile structured data mapping', () => {
     });
   });
 
+  it('returns every structured compatibility field from the owner GET', async () => {
+    authed();
+    mocks.prisma.profile.findUnique.mockResolvedValue({
+      ...oldProfileRow,
+      relationshipIntent: 'companionship',
+      distancePreference: 'nearby',
+      lifestyleCharacteristics: ['active'],
+      valuesPriorities: ['kindness'],
+      partnerPreferences: ['communication'],
+    });
+    const { GET } = await import('@/app/api/profile/route');
+
+    const response = await GET(new Request('http://test/api/profile'));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      relationshipIntent: 'companionship',
+      distancePreference: 'nearby',
+      lifestyleCharacteristics: ['active'],
+      valuesPriorities: ['kindness'],
+      partnerPreferences: ['communication'],
+    });
+  });
+
   it('persists both lifestyle fields independently while keeping owner scoping', async () => {
     authed();
     mocks.prisma.profile.findUnique.mockResolvedValue(oldProfileRow);
@@ -182,5 +206,51 @@ describe('/api/profile structured data mapping', () => {
     expect(responseBody.lifestylePreferences).toEqual(['Pet-friendly', 'Quiet home']);
     expect(responseBody.lifestyleCharacteristics).toEqual(['active']);
     expect(responseBody.partnerPreferences).toEqual(['open-minded']);
+  });
+
+  it('keeps all five matching-only fields intact on owner POST', async () => {
+    authed();
+    mocks.prisma.profile.findUnique.mockResolvedValue(null);
+    mocks.prisma.profile.create.mockResolvedValue({
+      ...oldProfileRow,
+      relationshipIntent: 'romance',
+      distancePreference: 'same-city',
+      lifestyleCharacteristics: ['homebody'],
+      valuesPriorities: ['family'],
+      partnerPreferences: ['humor'],
+    });
+    const { POST } = await import('@/app/api/profile/route');
+
+    const response = await POST(
+      new Request('http://test/api/profile', {
+        method: 'POST',
+        body: JSON.stringify({
+          age: 68,
+          location: 'Paris',
+          interests: ['walking'],
+          lifestylePreferences: ['Quiet home'],
+          relationshipIntent: 'romance',
+          distancePreference: 'same-city',
+          lifestyleCharacteristics: ['homebody'],
+          valuesPriorities: ['family'],
+          partnerPreferences: ['humor'],
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(mocks.prisma.profile.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: SESSION_ID,
+          lifestylePreferences: ['Quiet home'],
+          relationshipIntent: 'romance',
+          distancePreference: 'same-city',
+          lifestyleCharacteristics: ['homebody'],
+          valuesPriorities: ['family'],
+          partnerPreferences: ['humor'],
+        }),
+      }),
+    );
   });
 });

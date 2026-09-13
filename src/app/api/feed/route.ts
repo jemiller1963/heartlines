@@ -12,7 +12,7 @@ import { NextResponse } from 'next/server';
 import { getEligibleDiscoveryCandidates } from '@/lib/business/discovery-candidates';
 import { scoreCandidate } from '@/lib/business/matching';
 import { FeedList, FeedQuery } from '@/lib/contracts/feed';
-import { ProfileItem } from '@/lib/contracts/profile';
+import { ProfilePublicItem } from '@/lib/contracts/profile-public';
 import { prisma } from '@/lib/db';
 import { authOrResponse } from '@/lib/require-auth-result';
 
@@ -23,22 +23,28 @@ const PAGE_SIZE = 10;
 function profileShape(row: {
   id: string;
   userId: string;
+  displayName?: string | null;
   age: number;
   location: string;
   interests: string[];
-  lifestylePreferences: string[];
-  bio: string | null;
+  lifestylePreferences?: string[];
+  bio?: string | null;
+  avatarUrl?: string | null;
+  verificationStatus?: 'unverified' | 'pending' | 'approved' | 'rejected' | null;
   createdAt: Date;
   updatedAt: Date;
 }) {
-  return ProfileItem.parse({
+  return ProfilePublicItem.parse({
     id: row.id,
     userId: row.userId,
+    displayName: row.displayName ?? null,
     age: row.age,
     location: row.location,
     interests: row.interests,
-    lifestylePreferences: row.lifestylePreferences,
-    bio: row.bio ?? undefined,
+    lifestylePreferences: row.lifestylePreferences ?? [],
+    bio: row.bio ?? null,
+    avatarUrl: row.avatarUrl ?? null,
+    verificationStatus: row.verificationStatus ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   });

@@ -69,6 +69,11 @@ function candidateRow(
     location,
     interests,
     lifestylePreferences: [],
+    relationshipIntent: 'companionship',
+    distancePreference: 'nearby',
+    lifestyleCharacteristics: ['active'],
+    valuesPriorities: ['kindness'],
+    partnerPreferences: ['communication'],
     bio: null,
     avatarUrl: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -188,6 +193,48 @@ describe('GET /api/feed — excludes B (blocked) but keeps C', () => {
   });
 });
 
+describe('GET /api/feed — public profile projection', () => {
+  it('omits matching-only fields from card payloads', async () => {
+    authed('user-A');
+    mocks.prisma.profile.findUnique.mockResolvedValue(VIEWER_PROFILE);
+    mocks.prisma.profile.findMany.mockResolvedValue([
+      {
+        ...candidateRow('public', KEEP_USER, 52, 'Paris', ['hiking']),
+        bio: 'Enjoying the good conversations.',
+      },
+    ]);
+
+    const { GET } = await getRoute();
+    const response = await GET(new Request('http://test/api/feed'));
+    const body = await response.json();
+    const profile = body.items[0]?.profile as Record<string, unknown>;
+
+    expect(profile).toMatchObject({
+      id: expect.any(String),
+      userId: KEEP_USER,
+      displayName: null,
+      age: 52,
+      location: 'Paris',
+      interests: ['hiking'],
+      lifestylePreferences: [],
+      bio: 'Enjoying the good conversations.',
+      avatarUrl: null,
+      verificationStatus: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    for (const field of [
+      'relationshipIntent',
+      'distancePreference',
+      'lifestyleCharacteristics',
+      'valuesPriorities',
+      'partnerPreferences',
+    ]) {
+      expect(profile).not.toHaveProperty(field);
+    }
+  });
+});
+
 // --- GET /api/feed — block + swipe coexistence ------------------------------
 
 describe('GET /api/feed — block exclusion sits alongside swipe/seen exclusion', () => {
@@ -246,15 +293,11 @@ describe('GET /api/feed — canonical recent-seen and outgoing-connection exclus
       const cutoff = where?.seenAt?.gte;
       return Promise.resolve(
         seenRows
-          .filter(
-            (row) => row.status === where?.status && (!cutoff || row.seenAt >= cutoff),
-          )
+          .filter((row) => row.status === where?.status && (!cutoff || row.seenAt >= cutoff))
           .map(({ targetUserId }) => ({ targetUserId })),
       );
     });
-    mocks.prisma.connection.findMany.mockResolvedValue([
-      { toUserId: OUTGOING_CONNECTION_USER },
-    ]);
+    mocks.prisma.connection.findMany.mockResolvedValue([{ toUserId: OUTGOING_CONNECTION_USER }]);
 
     const captured = vi.fn();
     mocks.prisma.profile.findMany.mockImplementation((args) => {
@@ -284,9 +327,7 @@ describe('GET /api/feed — canonical recent-seen and outgoing-connection exclus
     const discoveryWhere = mocks.prisma.discovery.findMany.mock.calls[0]?.[0]?.where;
     expect(discoveryWhere?.viewerUserId).toBe(VIEWER_USER);
     expect(discoveryWhere?.status).toBe('seen');
-    expect(discoveryWhere?.seenAt?.gte).toEqual(
-      new Date(now.getTime() - 30 * 86_400_000),
-    );
+    expect(discoveryWhere?.seenAt?.gte).toEqual(new Date(now.getTime() - 30 * 86_400_000));
     expect(mocks.prisma.connection.findMany).toHaveBeenCalledWith({
       where: { fromUserId: VIEWER_USER },
       select: { toUserId: true },
