@@ -2,10 +2,10 @@
 // resource. Keep client-importable: zod only.
 
 import { z } from 'zod';
-import { ProfileItem } from './profile';
+import { ProfilePublicItem } from './profile-public';
 
 export const FeedItem = z.object({
-  profile: ProfileItem,
+  profile: ProfilePublicItem,
   matchScore: z.number().min(0).max(100),
   sharedInterests: z.array(z.string()),
 });

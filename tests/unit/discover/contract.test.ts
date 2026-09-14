@@ -51,17 +51,20 @@ vi.mock('@/lib/require-auth', () => ({
 describe('discover shared contract', () => {
   it('DiscoverMatchItem accepts a valid profile + score in [0,100]', async () => {
     const { DiscoverMatchItem } = await import('@/lib/contracts/discover');
-    const NOW = new Date().toISOString();
     const result = DiscoverMatchItem.safeParse({
       profile: {
         id: 'profile-1',
         userId: 'user-1',
+        displayName: null,
         age: 52,
         location: 'Paris',
         interests: ['hiking', 'cooking'],
         lifestylePreferences: [],
-        createdAt: NOW,
-        updatedAt: NOW,
+        bio: null,
+        avatarUrl: null,
+        verificationStatus: null,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
       },
       name: 'Alice',
       score: 87,
@@ -72,17 +75,20 @@ describe('discover shared contract', () => {
 
   it('DiscoverMatchItem rejects an out-of-range score', async () => {
     const { DiscoverMatchItem } = await import('@/lib/contracts/discover');
-    const NOW = new Date().toISOString();
     const result = DiscoverMatchItem.safeParse({
       profile: {
         id: 'profile-1',
         userId: 'user-1',
+        displayName: null,
         age: 52,
         location: 'Paris',
         interests: ['hiking'],
         lifestylePreferences: [],
-        createdAt: NOW,
-        updatedAt: NOW,
+        bio: null,
+        avatarUrl: null,
+        verificationStatus: null,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
       },
       name: 'Alice',
       score: 150,
@@ -94,14 +100,22 @@ describe('discover shared contract', () => {
   it('DiscoverResult accepts a full valid payload', async () => {
     const { DiscoverResult } = await import('@/lib/contracts/discover');
     expect(
-      DiscoverResult.safeParse({ matches: [], nextCursor: null, hasProfile: true }).success,
+      DiscoverResult.safeParse({
+        matches: [],
+        nextCursor: null,
+        hasProfile: true,
+      }).success,
     ).toBe(true);
   });
 
   it('DiscoverResult rejects a non-nullable nextCursor', async () => {
     const { DiscoverResult } = await import('@/lib/contracts/discover');
     expect(
-      DiscoverResult.safeParse({ matches: [], nextCursor: 42, hasProfile: false }).success,
+      DiscoverResult.safeParse({
+        matches: [],
+        nextCursor: 42,
+        hasProfile: false,
+      }).success,
     ).toBe(false);
   });
 
@@ -110,8 +124,12 @@ describe('discover shared contract', () => {
     // zod 3 z.object is passthrough-by-default: extras don't fail. Drift is
     // caught instead by the strict shape of the typed payload below.
     expect(
-      DiscoverResult.safeParse({ matches: [], nextCursor: null, hasProfile: false, foo: 'bar' })
-        .success,
+      DiscoverResult.safeParse({
+        matches: [],
+        nextCursor: null,
+        hasProfile: false,
+        foo: 'bar',
+      }).success,
     ).toBe(true);
   });
 
@@ -151,6 +169,11 @@ function eligibleProfileRow(idSuffix: string, userId: string) {
     location: 'Paris',
     interests: ['hiking'],
     lifestylePreferences: [],
+    relationshipIntent: 'companionship',
+    distancePreference: 'nearby',
+    lifestyleCharacteristics: ['active'],
+    valuesPriorities: ['kindness'],
+    partnerPreferences: ['communication'],
     bio: null,
     avatarUrl: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -192,7 +215,9 @@ const getRoute = () => import('@/app/api/discover/matches/route');
 describe('discover route — auth + empty branches', () => {
   it('returns 401 when requireAuth rejects', async () => {
     mocks.requireAuth.mockImplementation(() => {
-      throw new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+      throw new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+      });
     });
     const { GET } = await getRoute();
     const res = await GET(new Request('http://test/api/discover/matches'));
@@ -214,7 +239,11 @@ describe('discover route — auth + empty branches', () => {
     const { GET } = await getRoute();
     const res = await GET(new Request('http://test/api/discover/matches'));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ matches: [], nextCursor: null, hasProfile: false });
+    expect(await res.json()).toEqual({
+      matches: [],
+      nextCursor: null,
+      hasProfile: false,
+    });
   });
 
   it('returns 200 with an empty list when no candidates match', async () => {
@@ -225,12 +254,58 @@ describe('discover route — auth + empty branches', () => {
     const { GET } = await getRoute();
     const res = await GET(new Request('http://test/api/discover/matches'));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ matches: [], nextCursor: null, hasProfile: true });
+    expect(await res.json()).toEqual({
+      matches: [],
+      nextCursor: null,
+      hasProfile: true,
+    });
     const args = captured.mock.calls[0]?.[0];
     expect(args?.where?.age).toEqual({ gte: 50 });
     expect(args?.where?.reviewStatus).toBe('APPROVED');
     expect(args?.orderBy).toEqual({ id: 'asc' });
     expect(args?.take).toBe(40);
+  });
+});
+
+describe('discover route — public profile projection', () => {
+  it('omits matching-only fields from discovery card payloads', async () => {
+    authed();
+    mocks.prisma.profile.findUnique.mockResolvedValue(VIEWER_PROFILE);
+    mocks.prisma.profile.findMany.mockResolvedValue([
+      {
+        ...eligibleProfileRow('public', 'user-public'),
+        bio: 'Enjoying the good conversations.',
+      },
+    ]);
+
+    const { GET } = await getRoute();
+    const response = await GET(new Request('http://test/api/discover/matches'));
+    const body = await response.json();
+    const profile = body.matches[0]?.profile as Record<string, unknown>;
+
+    expect(profile).toMatchObject({
+      id: expect.any(String),
+      userId: 'user-public',
+      displayName: null,
+      age: 52,
+      location: 'Paris',
+      interests: ['hiking'],
+      lifestylePreferences: [],
+      bio: 'Enjoying the good conversations.',
+      avatarUrl: null,
+      verificationStatus: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    for (const field of [
+      'relationshipIntent',
+      'distancePreference',
+      'lifestyleCharacteristics',
+      'valuesPriorities',
+      'partnerPreferences',
+    ]) {
+      expect(profile).not.toHaveProperty(field);
+    }
   });
 });
 
@@ -289,8 +364,16 @@ describe('discover route — scored ordering', () => {
     vi.setSystemTime(now);
     authed();
     mocks.prisma.profile.findUnique.mockResolvedValue(VIEWER_PROFILE);
-    mocks.prisma.swipe.findMany.mockResolvedValue([{ toUserId: 'user-mutual' }]);
-    mocks.prisma.discovery.findMany.mockResolvedValue([{ targetUserId: 'user-seen' }]);
+    mocks.prisma.swipe.findMany.mockResolvedValue([
+      {
+        toUserId: 'user-mutual',
+      },
+    ]);
+    mocks.prisma.discovery.findMany.mockResolvedValue([
+      {
+        targetUserId: 'user-seen',
+      },
+    ]);
 
     const captured = vi.fn();
     mocks.prisma.profile.findMany.mockImplementation((args) => {
@@ -321,16 +404,18 @@ describe('discover route — scored ordering', () => {
     const discoveryWhere = mocks.prisma.discovery.findMany.mock.calls[0]?.[0]?.where;
     expect(discoveryWhere?.viewerUserId).toBe(VIEWER_USER);
     expect(discoveryWhere?.status).toBe('seen');
-    expect(discoveryWhere?.seenAt?.gte).toEqual(
-      new Date(now.getTime() - 30 * 86_400_000),
-    );
+    expect(discoveryWhere?.seenAt?.gte).toEqual(new Date(now.getTime() - 30 * 86_400_000));
   });
 
   it('excludes an outgoing Connection even when no Swipe exists', async () => {
     authed();
     mocks.prisma.profile.findUnique.mockResolvedValue(VIEWER_PROFILE);
     mocks.prisma.swipe.findMany.mockResolvedValue([]);
-    mocks.prisma.connection.findMany.mockResolvedValue([{ toUserId: 'user-connected' }]);
+    mocks.prisma.connection.findMany.mockResolvedValue([
+      {
+        toUserId: 'user-connected',
+      },
+    ]);
 
     const captured = vi.fn();
     const connected = eligibleProfileRow('connected', 'user-connected');

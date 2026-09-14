@@ -13,6 +13,7 @@ import { getEligibleDiscoveryCandidates } from '@/lib/business/discovery-candida
 import { interestOverlap } from '@/lib/business/matching';
 import { type DiscoverMatchItem, DiscoverQuery, DiscoverResult } from '@/lib/contracts/discover';
 import { ProfileItem } from '@/lib/contracts/profile';
+import { ProfilePublicItem } from '@/lib/contracts/profile-public';
 import { prisma } from '@/lib/db';
 import { scoreMatch } from '@/lib/matching/compatibility';
 import { authOrResponse } from '@/lib/require-auth-result';
@@ -23,6 +24,35 @@ const PAGE_SIZE = 10;
 const CANDIDATE_FETCH = PAGE_SIZE * 4;
 
 function profileShape(row: {
+  id: string;
+  userId: string;
+  displayName?: string | null;
+  age: number;
+  location: string;
+  interests: string[];
+  lifestylePreferences?: string[];
+  bio?: string | null;
+  avatarUrl?: string | null;
+  verificationStatus?: 'unverified' | 'pending' | 'approved' | 'rejected' | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return ProfilePublicItem.parse({
+    id: row.id,
+    userId: row.userId,
+    displayName: row.displayName ?? null,
+    age: row.age,
+    location: row.location,
+    interests: row.interests,
+    lifestylePreferences: row.lifestylePreferences ?? [],
+    bio: row.bio ?? null,
+    avatarUrl: row.avatarUrl ?? null,
+    verificationStatus: row.verificationStatus ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  });
+}
+function matchingProfileShape(row: {
   id: string;
   userId: string;
   age: number;
@@ -58,7 +88,9 @@ export async function GET(req: Request) {
   });
   if (!query.success) {
     return NextResponse.json(
-      { errors: { cursor: query.error.issues[0]?.message ?? 'Invalid cursor' } },
+      {
+        errors: { cursor: query.error.issues[0]?.message ?? 'Invalid cursor' },
+      },
       { status: 400 },
     );
   }
@@ -68,7 +100,11 @@ export async function GET(req: Request) {
   });
   if (!viewerProfile) {
     return NextResponse.json(
-      DiscoverResult.parse({ matches: [], nextCursor: null, hasProfile: false }),
+      DiscoverResult.parse({
+        matches: [],
+        nextCursor: null,
+        hasProfile: false,
+      }),
     );
   }
 
@@ -91,15 +127,18 @@ export async function GET(req: Request) {
         });
   const nameById = new Map<string, string>(userRows.map((row) => [row.id, row.name ?? '']));
 
-  const viewerItem = profileShape(viewerProfile);
+  const viewerItem = matchingProfileShape(viewerProfile);
 
   // Stable order: score DESC then id ASC. Shape each candidate once — score
   // and sharedInterests computed side-by-side from the same viewerItem.
   const scored = candidates
     .map((row) => {
+      const matchingProfile = matchingProfileShape(row);
       const profile = profileShape(row);
-      const score = scoreMatch(viewerItem, profile).totalScore;
-      const shared = interestOverlap(viewerItem.interests, profile.interests).shared;
+
+      const score = scoreMatch(viewerItem, matchingProfile).totalScore;
+      const shared = interestOverlap(viewerItem.interests, matchingProfile.interests).shared;
+
       return { row, profile, score, shared };
     })
     .sort((a, b) => {
