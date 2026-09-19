@@ -161,6 +161,7 @@ function VerificationRow({ item, disabled, isBusiest, onApprove, onReject }: Row
                 alt={`ID for ${item.name ?? item.userId}`}
                 width={220}
                 height={320}
+                unoptimized
                 className="h-64 w-full object-contain"
               />
             </div>

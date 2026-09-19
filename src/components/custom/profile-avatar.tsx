@@ -1,14 +1,13 @@
 // @polsia:user-owned — Profile photo picker + upload + remove.
 //
 // Combined UI block rendered above the text-form on both `/profile` and
-// `/onboarding`. POSTs multipart/form-data directly to /api/profile/avatar
-// (NOT through `apiFetch`, which forces JSON content-type). Server errors of
-// the shape `{ errors: { avatar: '...' } }` are surfaced inline below the
-// input; success swaps the local preview for the canonical URL emitted by
-// the server.
+// `/onboarding`. The browser uploads directly to the public avatar Blob store;
+// /api/profile/avatar only authorizes the upload and handles the signed
+// completion callback that persists its URL.
 
 'use client';
 
+import { upload as uploadBlob } from '@vercel/blob/client';
 import { Camera, Loader2, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -16,11 +15,15 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ProfileItem } from '@/lib/contracts/profile';
+import {
+  IMAGE_UPLOAD_CONTENT_TYPES,
+  IMAGE_UPLOAD_MAX_BYTES,
+  imageExtension,
+} from '@/lib/contracts/uploads';
 import { cn } from '@/lib/utils';
 
-const ACCEPT = 'image/jpeg,image/png,image/webp';
-const MAX_BYTES = 5 * 1024 * 1024;
-const ALLOWED_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const ACCEPT = IMAGE_UPLOAD_CONTENT_TYPES.join(',');
+const ALLOWED_MIMES = new Set<string>(IMAGE_UPLOAD_CONTENT_TYPES);
 
 interface ProfileAvatarProps {
   currentUrl: string | null | undefined;
@@ -30,8 +33,16 @@ interface ProfileAvatarProps {
   onUpdated: (item: ProfileItem) => void;
 }
 
-interface ErrorBody {
-  errors?: { avatar?: string };
+async function waitForPersistedAvatar(avatarUrl: string): Promise<ProfileItem | null> {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const response = await fetch('/api/profile', { cache: 'no-store' });
+    if (response.ok) {
+      const profile = ProfileItem.parse(await response.json());
+      if (profile.avatarUrl === avatarUrl) return profile;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return null;
 }
 
 export function ProfileAvatar({
@@ -58,7 +69,7 @@ export function ProfileAvatar({
   async function upload(file: File) {
     setError(null);
 
-    if (file.size > MAX_BYTES) {
+    if (file.size > IMAGE_UPLOAD_MAX_BYTES) {
       setError('Photo must be 5 MB or smaller.');
       return;
     }
@@ -73,32 +84,37 @@ export function ProfileAvatar({
     setDisplayUrl(blobUrl);
     setBusy(true);
 
+    let uploadedUrl: string | null = null;
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await fetch('/api/profile/avatar', { method: 'POST', body: fd });
-      const body: ErrorBody | ProfileItem | null = await res.json().catch(() => null);
-      if (!res.ok) {
-        revokePreview();
-        setDisplayUrl(currentUrl ?? null);
-        const msg =
-          body && 'errors' in body && body.errors?.avatar
-            ? body.errors.avatar
-            : 'Could not upload your photo.';
-        setError(msg);
-        toast.error(msg);
-        return;
-      }
-      const updated = ProfileItem.parse(body);
+      const extension = imageExtension(file.type);
+      if (!extension) throw new Error('Unsupported image type');
+      const blob = await uploadBlob(`avatars/${crypto.randomUUID()}.${extension}`, file, {
+        access: 'public',
+        contentType: file.type,
+        handleUploadUrl: '/api/profile/avatar',
+      });
+      uploadedUrl = blob.url;
       revokePreview();
-      setDisplayUrl(updated.avatarUrl ?? null);
-      onUpdated(updated);
-      toast.success('Profile photo updated.');
+      setDisplayUrl(blob.url);
+
+      const updated = await waitForPersistedAvatar(blob.url).catch(() => null);
+      if (updated) {
+        onUpdated(updated);
+        toast.success('Profile photo updated.');
+      } else {
+        toast.warning('Photo uploaded and is still being processed.');
+      }
     } catch {
       revokePreview();
-      setDisplayUrl(currentUrl ?? null);
-      setError('Could not upload your photo.');
-      toast.error('Could not upload your photo.');
+      // Once upload() returns, the signed callback can still finish even if
+      // the follow-up profile refresh fails. Never visually roll that URL back.
+      setDisplayUrl(uploadedUrl ?? currentUrl ?? null);
+      const message = uploadedUrl
+        ? 'Photo uploaded and is still being processed.'
+        : 'Could not upload your photo.';
+      setError(message);
+      if (uploadedUrl) toast.warning(message);
+      else toast.error(message);
     } finally {
       setBusy(false);
     }

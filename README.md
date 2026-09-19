@@ -239,6 +239,21 @@ prefix the command with `SKIP_ENV_VALIDATION=1`.
 `/` serves the `(setup)` placeholder until a module or app-authored root page
 takes over.
 
+### Blob storage
+
+Heart Lines uses two separately connected Vercel Blob stores:
+
+- A **public** avatar store exposed to server code as
+  `AVATAR_BLOB_READ_WRITE_TOKEN`.
+- A **private** government-ID store exposed to server code as
+  `VERIFICATION_BLOB_READ_WRITE_TOKEN`.
+
+Both upload flows send file bytes directly from the browser to Vercel Blob.
+The application route authorizes a 5 MB JPEG/PNG/WEBP upload and the signed
+completion callback persists the resulting URL. Private government IDs are
+read only through the admin-authorized same-origin streaming route; their Blob
+URLs must never be returned to client code.
+
 ## Versions
 
 Pinned exact versions are used for the framework stack:

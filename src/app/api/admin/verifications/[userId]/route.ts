@@ -73,7 +73,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ userId:
     }),
     prisma.idVerification.findUnique({
       where: { userId },
-      select: { imagePath: true, status: true, submittedAt: true },
+      select: { status: true, submittedAt: true },
     }),
     prisma.user.findUnique({
       where: { id: userId },
@@ -92,7 +92,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ userId:
     age: updatedProfile.age,
     location: updatedProfile.location,
     submittedAt: updatedSubmission.submittedAt.toISOString(),
-    imagePath: updatedSubmission.imagePath,
+    imagePath: `/api/admin/verifications/${encodeURIComponent(userId)}/image`,
     status: updatedSubmission.status,
   });
   return NextResponse.json(item);
