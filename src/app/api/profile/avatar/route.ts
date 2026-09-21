@@ -84,7 +84,7 @@ export async function POST(req: Request) {
         return {
           allowedContentTypes: [...IMAGE_UPLOAD_CONTENT_TYPES],
           maximumSizeInBytes: IMAGE_UPLOAD_MAX_BYTES,
-          addRandomSuffix: true,
+          addRandomSuffix: false,
           tokenPayload: JSON.stringify({ kind: 'avatar', userId: authorizedUserId }),
         };
       },

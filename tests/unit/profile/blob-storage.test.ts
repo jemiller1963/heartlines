@@ -119,7 +119,7 @@ describe('avatar Blob upload route', () => {
     expect(mocks.generatedConstraints.current).toMatchObject({
       allowedContentTypes: ['image/jpeg', 'image/png', 'image/webp'],
       maximumSizeInBytes: 5 * 1024 * 1024,
-      addRandomSuffix: true,
+      addRandomSuffix: false,
     });
     expect(JSON.parse(String(mocks.generatedConstraints.current?.tokenPayload))).toEqual({
       kind: 'avatar',
@@ -187,6 +187,30 @@ describe('avatar Blob upload route', () => {
 });
 
 describe('verification-ID Blob upload route', () => {
+  it('preserves the client-generated private pathname for completion validation', async () => {
+    mocks.authOrResponse.mockResolvedValue({ ok: true, session: { id: USER_ID } });
+    mocks.prisma.profile.findUnique.mockResolvedValue({
+      id: 'profile-1',
+      verificationStatus: 'unverified',
+    });
+    const { POST } = await import('@/app/api/profile/verification-id/route');
+
+    const response = await POST(
+      request(tokenEvent(PRIVATE_PATH), '/api/profile/verification-id'),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.generatedConstraints.current).toMatchObject({
+      allowedContentTypes: ['image/jpeg', 'image/png', 'image/webp'],
+      maximumSizeInBytes: 5 * 1024 * 1024,
+      addRandomSuffix: false,
+    });
+    expect(JSON.parse(String(mocks.generatedConstraints.current?.tokenPayload))).toEqual({
+      kind: 'verification-id',
+      userId: USER_ID,
+    });
+  });
+
   it('does not issue a new upload token after approval', async () => {
     mocks.authOrResponse.mockResolvedValue({ ok: true, session: { id: USER_ID } });
     mocks.prisma.profile.findUnique.mockResolvedValue({
