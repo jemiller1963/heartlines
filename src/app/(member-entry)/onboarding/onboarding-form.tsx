@@ -333,7 +333,15 @@ export function OnboardingForm() {
                     Add at least one interest — shared hobbies drive the match score.
                   </p>
                 )}
-                <FormField control={form.control} name="interests" render={() => <FormMessage />} />
+                <FormField
+                  control={form.control}
+                  name="interests"
+                  render={() => (
+                    <FormItem>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               <div className="flex justify-end gap-3 border-t border-border pt-5">

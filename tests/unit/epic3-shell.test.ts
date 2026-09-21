@@ -89,6 +89,9 @@ describe('Epic 3 structural shells', () => {
     expect(onboarding).not.toContain(
       '<FormLabel htmlFor="onboarding-new-interest">Interests</FormLabel>',
     );
+    expect(onboarding).toMatch(
+      /name="interests"[\s\S]*?render=\{\(\) => \([\s\S]*?<FormItem>[\s\S]*?<FormMessage \/>[\s\S]*?<\/FormItem>[\s\S]*?\)\}/,
+    );
   });
 
   it('keeps member deep links and removes the nonexistent event edit link', () => {
