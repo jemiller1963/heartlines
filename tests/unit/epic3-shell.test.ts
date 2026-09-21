@@ -81,6 +81,16 @@ describe('Epic 3 structural shells', () => {
     );
   });
 
+  it('keeps standalone onboarding labels out of FormField-only primitives', () => {
+    const onboarding = source('src/app/(member-entry)/onboarding/onboarding-form.tsx');
+    expect(onboarding).toContain(
+      '<Label htmlFor="onboarding-new-interest">Interests</Label>',
+    );
+    expect(onboarding).not.toContain(
+      '<FormLabel htmlFor="onboarding-new-interest">Interests</FormLabel>',
+    );
+  });
+
   it('keeps member deep links and removes the nonexistent event edit link', () => {
     for (const file of [
       'feed/page.tsx',
