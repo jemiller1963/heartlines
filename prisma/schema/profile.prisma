@@ -46,8 +46,8 @@ model Profile {
   valuesPriorities  String[]            @default([])
   partnerPreferences String[]           @default([])
   bio               String?
-  // Served same-origin from /public/uploads/<userId>.<ext>. Set/unset by POST
-  // and DELETE on /api/profile/avatar (owner-only).
+  // Public Vercel Blob URL. Set/unset by the signed completion callback and
+  // DELETE /api/profile/avatar; clients never set this through ProfilePatch.
   avatarUrl         String?
   // Owner-only ID verification state. Flipped to `pending` by POST on
   // /api/profile/verification-id; admin review will set `approved`/`rejected`.
@@ -71,10 +71,12 @@ model Profile {
 model IdVerification {
   id          String           @id @default(cuid())
   userId      String           @unique
-  // Served same-origin from /public/uploads/verification/<userId>.<ext>.
-  imagePath   String
+  // Private Vercel Blob URL while review is pending. Cleared immediately
+  // after an admin decision; clients never receive this value from app APIs.
+  imagePath   String?
   status      VerificationStatus
   submittedAt DateTime         @default(now())
+  reviewedAt  DateTime?
 
   @@map("id_verification")
 }

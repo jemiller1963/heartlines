@@ -44,6 +44,9 @@ jobs:
           npx vitest run \
             tests/unit/profile/structured-data.contract.test.ts \
             tests/unit/profile/public-profile.contract.test.ts \
+            tests/unit/profile/blob-storage.test.ts \
+            tests/unit/profile/private-id-ui.test.ts \
+            tests/unit/csp.test.ts \
             tests/unit/epic4-signup.test.ts \
             tests/unit/epic3-shell.test.ts \
             tests/unit/events/rsvp.contract.test.ts \

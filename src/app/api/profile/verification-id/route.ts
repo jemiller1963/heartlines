@@ -1,128 +1,175 @@
-// @polsia:user-owned — owner-only identity-verification photo upload.
-//
-// POST stores the file under /public/uploads/verification/<userId>.<ext> on the
-// host filesystem (v1 storage: same-origin via Next's static handler, deduped
-// by userId so re-uploads overwrite without us tracking orphan files). It
-// upserts the IdVerification row and flips Profile.verificationStatus to
-// 'pending'. 409 if the profile is already in the approved state. The admin
-// review slice (next) will be the only path that sets 'approved'/'rejected'.
-//
-// Gates on authOrResponse(req) and scopes by session.userId — never trust a
-// body-supplied userId (IDOR). The Prisma PK constraint on IdVerification.userId
-// is the single-source-of-truth owner check: the upsert target where-clause is
-// keyed by the session user.
+// @polsia:user-owned — owner-only private Blob identity-verification upload.
 
 import 'server-only';
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
+import { issueSignedToken } from '@vercel/blob';
+import {
+  type HandleUploadPresignedBody,
+  handleUploadPresigned,
+} from '@vercel/blob/client';
 import { NextResponse } from 'next/server';
-import { ProfileItem } from '@/lib/contracts/profile';
+import {
+  BlobConfigurationError,
+  deletePrivateBlobOrThrow,
+  deleteReplacedBlob,
+  getBlobWebhookPublicKey,
+  getVerificationBlobToken,
+  isPrivateVercelBlobUrl,
+} from '@/lib/business/blob-storage';
+import {
+  IMAGE_UPLOAD_CONTENT_TYPES,
+  IMAGE_UPLOAD_MAX_BYTES,
+  isUploadPath,
+  UploadTokenPayload,
+} from '@/lib/contracts/uploads';
 import { prisma } from '@/lib/db';
 import { authOrResponse } from '@/lib/require-auth-result';
 
 export const dynamic = 'force-dynamic';
 
-const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
-const ALLOWED_MIME: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-};
-const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'verification');
-
-function verificationError(message: string) {
-  return NextResponse.json({ errors: { verificationId: message } }, { status: 400 });
-}
-
-function shape(row: {
-  id: string;
-  userId: string;
-  age: number;
-  location: string;
-  interests: string[];
-  bio: string | null;
-  avatarUrl: string | null;
-  verificationStatus: 'unverified' | 'pending' | 'approved' | 'rejected' | null;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
-  return ProfileItem.parse({
-    id: row.id,
-    userId: row.userId,
-    age: row.age,
-    location: row.location,
-    interests: row.interests,
-    bio: row.bio ?? undefined,
-    avatarUrl: row.avatarUrl ?? null,
-    verificationStatus: row.verificationStatus ?? null,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  });
-}
+const PRESIGNED_UPLOAD_TTL_MS = 10 * 60 * 1000;
 
 export async function POST(req: Request) {
-  const auth = await authOrResponse(req);
-  if (!auth.ok) return auth.res;
-
-  let form: FormData;
-  try {
-    form = await req.formData();
-  } catch {
-    return verificationError('Upload must be multipart/form-data.');
-  }
-
-  const file = form.get('file');
-  if (!(file instanceof File) || file.size === 0) {
-    return verificationError('Choose a photo to upload.');
-  }
-  if (file.size > MAX_BYTES) {
-    return verificationError('Photo must be 5 MB or smaller.');
-  }
-
-  const ext = ALLOWED_MIME[file.type];
-  if (!ext) {
-    return verificationError('Photo must be a JPEG, PNG, or WEBP image.');
-  }
-
-  // Sanitize filename: never trust the client's. Filename is `<userId>.<ext>`
-  // so it cannot be used to traverse or impersonate another user.
-  const filename = `${auth.session.id}.${ext}`;
-  const target = path.join(UPLOAD_DIR, filename);
-  const imagePath = `/uploads/verification/${filename}`;
-
-  const existing = await prisma.profile.findUnique({ where: { userId: auth.session.id } });
-  if (!existing) {
+  const body = (await req.json().catch(() => null)) as HandleUploadPresignedBody | null;
+  if (!body?.type) {
     return NextResponse.json(
-      { errors: { verificationId: 'Save your basics first.' } },
-      { status: 404 },
+      { errors: { verificationId: 'Invalid upload request.' } },
+      { status: 400 },
     );
   }
-  if (existing.verificationStatus === 'approved') {
-    return NextResponse.json({ errors: { verificationId: 'Already verified.' } }, { status: 409 });
+
+  let authorizedUserId: string | null = null;
+  if (body.type === 'blob.generate-presigned-url') {
+    const auth = await authOrResponse(req);
+    if (!auth.ok) return auth.res;
+    authorizedUserId = auth.session.id;
+
+    const profile = await prisma.profile.findUnique({
+      where: { userId: authorizedUserId },
+      select: { id: true, verificationStatus: true },
+    });
+    if (!profile) {
+      return NextResponse.json(
+        { errors: { verificationId: 'Save your basics first.' } },
+        { status: 404 },
+      );
+    }
+    if (profile.verificationStatus === 'approved') {
+      return NextResponse.json(
+        { errors: { verificationId: 'Already verified.' } },
+        { status: 409 },
+      );
+    }
+    if (profile.verificationStatus === 'pending') {
+      return NextResponse.json(
+        { errors: { verificationId: 'Verification is already pending.' } },
+        { status: 409 },
+      );
+    }
   }
 
-  await fs.mkdir(UPLOAD_DIR, { recursive: true });
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await fs.writeFile(target, buffer);
+  try {
+    const token = getVerificationBlobToken();
+    const response = await handleUploadPresigned({
+      body,
+      request: req,
+      webhookPublicKey: getBlobWebhookPublicKey(),
+      getSignedToken: async (pathname) => {
+        if (!authorizedUserId || !isUploadPath('verification-id', pathname)) {
+          throw new Error('Invalid verification upload path.');
+        }
 
-  await prisma.idVerification.upsert({
-    where: { userId: auth.session.id },
-    create: {
-      userId: auth.session.id,
-      imagePath,
-      status: 'pending',
-      submittedAt: new Date(),
-    },
-    update: {
-      imagePath,
-      status: 'pending',
-      submittedAt: new Date(),
-    },
-  });
+        const validUntil = Date.now() + PRESIGNED_UPLOAD_TTL_MS;
+        return {
+          token: await issueSignedToken({
+            pathname,
+            operations: ['put'],
+            allowedContentTypes: [...IMAGE_UPLOAD_CONTENT_TYPES],
+            maximumSizeInBytes: IMAGE_UPLOAD_MAX_BYTES,
+            validUntil,
+            token,
+          }),
+          urlOptions: {
+            allowedContentTypes: [...IMAGE_UPLOAD_CONTENT_TYPES],
+            maximumSizeInBytes: IMAGE_UPLOAD_MAX_BYTES,
+            validUntil,
+            addRandomSuffix: false,
+            allowOverwrite: false,
+            tokenPayload: JSON.stringify({
+              kind: 'verification-id',
+              userId: authorizedUserId,
+            }),
+          },
+        };
+      },
+      onUploadCompleted: async ({ blob, tokenPayload }) => {
+        const payload = UploadTokenPayload.parse(JSON.parse(tokenPayload ?? 'null'));
+        if (
+          payload.kind !== 'verification-id' ||
+          !isUploadPath('verification-id', blob.pathname) ||
+          !isPrivateVercelBlobUrl(blob.url)
+        ) {
+          throw new Error('Invalid verification completion payload.');
+        }
 
-  const updated = await prisma.profile.update({
-    where: { userId: auth.session.id },
-    data: { verificationStatus: 'pending' },
-  });
-  return NextResponse.json(shape(updated));
+        const [profile, previous] = await Promise.all([
+          prisma.profile.findUnique({
+            where: { userId: payload.userId },
+            select: { verificationStatus: true },
+          }),
+          prisma.idVerification.findUnique({
+            where: { userId: payload.userId },
+            select: { imagePath: true, status: true },
+          }),
+        ]);
+
+        if (
+          !profile ||
+          profile.verificationStatus === 'approved' ||
+          (profile.verificationStatus === 'pending' &&
+            previous?.imagePath &&
+            previous.imagePath !== blob.url)
+        ) {
+          await deletePrivateBlobOrThrow(blob.url, token);
+          return;
+        }
+
+        const submittedAt = new Date();
+        await prisma.$transaction([
+          prisma.idVerification.upsert({
+            where: { userId: payload.userId },
+            create: {
+              userId: payload.userId,
+              imagePath: blob.url,
+              status: 'pending',
+              submittedAt,
+            },
+            update: {
+              imagePath: blob.url,
+              status: 'pending',
+              submittedAt,
+              reviewedAt: null,
+            },
+          }),
+          prisma.profile.update({
+            where: { userId: payload.userId },
+            data: { verificationStatus: 'pending' },
+          }),
+        ]);
+
+        if (previous?.imagePath && previous.imagePath !== blob.url) {
+          await deleteReplacedBlob(previous.imagePath, token);
+        }
+      },
+    });
+    return NextResponse.json(response);
+  } catch (error) {
+    const status = error instanceof BlobConfigurationError ? 503 : 400;
+    const message =
+      error instanceof BlobConfigurationError
+        ? 'Verification storage is not configured.'
+        : 'Could not process the verification upload.';
+    // biome-ignore lint/suspicious/noConsole: retain a server-side upload failure audit trail.
+    console.error(message, error);
+    return NextResponse.json({ errors: { verificationId: message } }, { status });
+  }
 }
