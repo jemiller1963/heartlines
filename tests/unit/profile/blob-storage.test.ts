@@ -97,7 +97,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   process.env.AVATAR_BLOB_READ_WRITE_TOKEN = 'vercel_blob_rw_avatar';
   process.env.VERIFICATION_BLOB_READ_WRITE_TOKEN = 'vercel_blob_rw_verification';
-  process.env.BLOB_WEBHOOK_PUBLIC_KEY = 'test-webhook-public-key';
+  process.env.VERIFICATION_BLOB_WEBHOOK_PUBLIC_KEY = 'test-webhook-public-key';
   mocks.generatedConstraints.current = null;
   mocks.generatedPresigned.current = null;
   mocks.issueSignedToken.mockResolvedValue({

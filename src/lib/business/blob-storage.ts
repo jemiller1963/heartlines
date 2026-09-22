@@ -9,7 +9,7 @@ function requiredValue(
   name:
     | 'AVATAR_BLOB_READ_WRITE_TOKEN'
     | 'VERIFICATION_BLOB_READ_WRITE_TOKEN'
-    | 'BLOB_WEBHOOK_PUBLIC_KEY',
+    | 'VERIFICATION_BLOB_WEBHOOK_PUBLIC_KEY',
 ) {
   const value = process.env[name];
   if (!value) {
@@ -27,7 +27,7 @@ export function getVerificationBlobToken() {
 }
 
 export function getBlobWebhookPublicKey() {
-  return requiredValue('BLOB_WEBHOOK_PUBLIC_KEY');
+  return requiredValue('VERIFICATION_BLOB_WEBHOOK_PUBLIC_KEY');
 }
 
 export function isVercelBlobUrl(value: string | null | undefined): value is string {
