@@ -5,7 +5,11 @@ import { BlobNotFoundError, get } from '@vercel/blob';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { BlobConfigurationError, getVerificationBlobToken } from '@/lib/business/blob-storage';
+import {
+  BlobConfigurationError,
+  getVerificationBlobToken,
+  isPrivateVercelBlobUrl,
+} from '@/lib/business/blob-storage';
 import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +28,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ userId:
     where: { userId },
     select: { imagePath: true },
   });
-  if (!submission) {
+  if (!submission?.imagePath || !isPrivateVercelBlobUrl(submission.imagePath)) {
     return new NextResponse('Not found', { status: 404 });
   }
 

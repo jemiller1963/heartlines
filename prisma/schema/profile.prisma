@@ -71,11 +71,12 @@ model Profile {
 model IdVerification {
   id          String           @id @default(cuid())
   userId      String           @unique
-  // Private Vercel Blob URL. Never return this value directly to a browser;
-  // admins read it through the authorized verification-image route.
-  imagePath   String
+  // Private Vercel Blob URL while review is pending. Cleared immediately
+  // after an admin decision; clients never receive this value from app APIs.
+  imagePath   String?
   status      VerificationStatus
   submittedAt DateTime         @default(now())
+  reviewedAt  DateTime?
 
   @@map("id_verification")
 }

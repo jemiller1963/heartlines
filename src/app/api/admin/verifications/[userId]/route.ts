@@ -1,17 +1,18 @@
 // @polsia:user-owned — admin-only approve/reject for one pending submission.
 //
-// Flips BOTH Profile.verificationStatus AND IdVerification.status inside a
-// single transaction so the two rows never drift. 409 if the row is no longer
-// pending so retries / double-taps don't silently rewrite state.
-//
-// Gates inline (auth.api.getSession + role === 'admin') — returns 401/403
-// rather than redirecting. Returns the post-mutation merged item so the client
-// island can drop the row in place without refetching the list.
+// Raw government-ID images are retained only while a submission is pending.
+// The private Blob is deleted before the decision transaction; then both status
+// rows are updated, imagePath is cleared, and reviewedAt is recorded.
 
 import 'server-only';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import {
+  BlobConfigurationError,
+  deletePrivateBlobOrThrow,
+  getVerificationBlobToken,
+} from '@/lib/business/blob-storage';
 import {
   AdminVerificationDecision,
   AdminVerificationItem,
@@ -40,18 +41,38 @@ export async function POST(req: Request, { params }: { params: Promise<{ userId:
   }
   const { action } = parsed.data;
 
-  const profile = await prisma.profile.findUnique({
-    where: { userId },
-    select: { id: true, userId: true, age: true, location: true, verificationStatus: true },
-  });
-  if (!profile) {
+  const [profile, submission] = await Promise.all([
+    prisma.profile.findUnique({
+      where: { userId },
+      select: { id: true, userId: true, age: true, location: true, verificationStatus: true },
+    }),
+    prisma.idVerification.findUnique({
+      where: { userId },
+      select: { imagePath: true, status: true },
+    }),
+  ]);
+
+  if (!profile || !submission) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-  if (profile.verificationStatus !== 'pending') {
+  if (profile.verificationStatus !== 'pending' || submission.status !== 'pending') {
     return NextResponse.json({ error: 'Already reviewed' }, { status: 409 });
+  }
+  if (!submission.imagePath) {
+    return NextResponse.json({ error: 'Verification image unavailable' }, { status: 409 });
+  }
+
+  try {
+    await deletePrivateBlobOrThrow(submission.imagePath, getVerificationBlobToken());
+  } catch (error) {
+    const status = error instanceof BlobConfigurationError ? 503 : 502;
+    // biome-ignore lint/suspicious/noConsole: retain a server-side retention failure audit trail.
+    console.error('Could not delete reviewed verification image.', error);
+    return NextResponse.json({ error: 'Could not finalize verification review' }, { status });
   }
 
   const next: 'approved' | 'rejected' = action === 'approve' ? 'approved' : 'rejected';
+  const reviewedAt = new Date();
 
   await prisma.$transaction([
     prisma.profile.update({
@@ -60,12 +81,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ userId:
     }),
     prisma.idVerification.update({
       where: { userId },
-      data: { status: next },
+      data: { status: next, imagePath: null, reviewedAt },
     }),
   ]);
 
-  // Re-read to return the published row shape exactly once, including timestamps
-  // and the verified user row (id/name/email).
   const [updatedProfile, updatedSubmission, user] = await Promise.all([
     prisma.profile.findUnique({
       where: { userId },

@@ -1,12 +1,19 @@
 // @polsia:user-owned — owner-only private Blob identity-verification upload.
 
 import 'server-only';
-import { type HandleUploadBody, handleUpload } from '@vercel/blob/client';
+import { issueSignedToken } from '@vercel/blob';
+import {
+  type HandleUploadPresignedBody,
+  handleUploadPresigned,
+} from '@vercel/blob/client';
 import { NextResponse } from 'next/server';
 import {
   BlobConfigurationError,
+  deletePrivateBlobOrThrow,
   deleteReplacedBlob,
+  getBlobWebhookPublicKey,
   getVerificationBlobToken,
+  isPrivateVercelBlobUrl,
 } from '@/lib/business/blob-storage';
 import {
   IMAGE_UPLOAD_CONTENT_TYPES,
@@ -19,8 +26,10 @@ import { authOrResponse } from '@/lib/require-auth-result';
 
 export const dynamic = 'force-dynamic';
 
+const PRESIGNED_UPLOAD_TTL_MS = 10 * 60 * 1000;
+
 export async function POST(req: Request) {
-  const body = (await req.json().catch(() => null)) as HandleUploadBody | null;
+  const body = (await req.json().catch(() => null)) as HandleUploadPresignedBody | null;
   if (!body?.type) {
     return NextResponse.json(
       { errors: { verificationId: 'Invalid upload request.' } },
@@ -29,7 +38,7 @@ export async function POST(req: Request) {
   }
 
   let authorizedUserId: string | null = null;
-  if (body.type === 'blob.generate-client-token') {
+  if (body.type === 'blob.generate-presigned-url') {
     const auth = await authOrResponse(req);
     if (!auth.ok) return auth.res;
     authorizedUserId = auth.session.id;
@@ -50,31 +59,55 @@ export async function POST(req: Request) {
         { status: 409 },
       );
     }
+    if (profile.verificationStatus === 'pending') {
+      return NextResponse.json(
+        { errors: { verificationId: 'Verification is already pending.' } },
+        { status: 409 },
+      );
+    }
   }
 
   try {
     const token = getVerificationBlobToken();
-    const response = await handleUpload({
+    const response = await handleUploadPresigned({
       body,
       request: req,
-      token,
-      onBeforeGenerateToken: async (pathname) => {
+      webhookPublicKey: getBlobWebhookPublicKey(),
+      getSignedToken: async (pathname) => {
         if (!authorizedUserId || !isUploadPath('verification-id', pathname)) {
           throw new Error('Invalid verification upload path.');
         }
+
+        const validUntil = Date.now() + PRESIGNED_UPLOAD_TTL_MS;
         return {
-          allowedContentTypes: [...IMAGE_UPLOAD_CONTENT_TYPES],
-          maximumSizeInBytes: IMAGE_UPLOAD_MAX_BYTES,
-          addRandomSuffix: false,
-          tokenPayload: JSON.stringify({
-            kind: 'verification-id',
-            userId: authorizedUserId,
+          token: await issueSignedToken({
+            pathname,
+            operations: ['put'],
+            allowedContentTypes: [...IMAGE_UPLOAD_CONTENT_TYPES],
+            maximumSizeInBytes: IMAGE_UPLOAD_MAX_BYTES,
+            validUntil,
+            token,
           }),
+          urlOptions: {
+            allowedContentTypes: [...IMAGE_UPLOAD_CONTENT_TYPES],
+            maximumSizeInBytes: IMAGE_UPLOAD_MAX_BYTES,
+            validUntil,
+            addRandomSuffix: false,
+            allowOverwrite: false,
+            tokenPayload: JSON.stringify({
+              kind: 'verification-id',
+              userId: authorizedUserId,
+            }),
+          },
         };
       },
       onUploadCompleted: async ({ blob, tokenPayload }) => {
         const payload = UploadTokenPayload.parse(JSON.parse(tokenPayload ?? 'null'));
-        if (payload.kind !== 'verification-id' || !isUploadPath('verification-id', blob.pathname)) {
+        if (
+          payload.kind !== 'verification-id' ||
+          !isUploadPath('verification-id', blob.pathname) ||
+          !isPrivateVercelBlobUrl(blob.url)
+        ) {
           throw new Error('Invalid verification completion payload.');
         }
 
@@ -85,12 +118,18 @@ export async function POST(req: Request) {
           }),
           prisma.idVerification.findUnique({
             where: { userId: payload.userId },
-            select: { imagePath: true },
+            select: { imagePath: true, status: true },
           }),
         ]);
 
-        if (!profile || profile.verificationStatus === 'approved') {
-          await deleteReplacedBlob(blob.url, token);
+        if (
+          !profile ||
+          profile.verificationStatus === 'approved' ||
+          (profile.verificationStatus === 'pending' &&
+            previous?.imagePath &&
+            previous.imagePath !== blob.url)
+        ) {
+          await deletePrivateBlobOrThrow(blob.url, token);
           return;
         }
 
@@ -108,6 +147,7 @@ export async function POST(req: Request) {
               imagePath: blob.url,
               status: 'pending',
               submittedAt,
+              reviewedAt: null,
             },
           }),
           prisma.profile.update({
@@ -115,7 +155,10 @@ export async function POST(req: Request) {
             data: { verificationStatus: 'pending' },
           }),
         ]);
-        await deleteReplacedBlob(previous?.imagePath, token);
+
+        if (previous?.imagePath && previous.imagePath !== blob.url) {
+          await deleteReplacedBlob(previous.imagePath, token);
+        }
       },
     });
     return NextResponse.json(response);

@@ -27,7 +27,7 @@ export const appCapabilities: AppCapabilities = {};
 
 /** Per-app extra CSP origins — frame/connect/media/font/img. */
 export const cspExtraSources: CspExtraSources = {
-  // @vercel/blob client uploads send file bytes directly to this API origin.
+  // @vercel/blob client-token and presigned writes use https://vercel.com/api/blob.
   connectSrc: ['https://vercel.com'],
 };
 

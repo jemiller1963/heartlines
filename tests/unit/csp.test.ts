@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { cspExtraSources } from '../../next.user-config';
 import { buildCsp } from '@/lib/csp';
 
 // Locks the platform CSP posture so a future edit can't silently re-tighten
@@ -41,6 +42,13 @@ describe('buildCsp', () => {
   it('appends a configured API origin to connect-src', () => {
     expect(buildCsp('n', false, 'https://api.example.com')).toContain(
       "connect-src 'self' https://api.example.com",
+    );
+  });
+
+  it('keeps the Vercel Blob control-plane origin available for direct uploads', () => {
+    expect(cspExtraSources.connectSrc).toContain('https://vercel.com');
+    expect(buildCsp('n', false, '', cspExtraSources)).toContain(
+      "connect-src 'self' https://vercel.com",
     );
   });
 });
