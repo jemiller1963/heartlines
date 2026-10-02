@@ -24,6 +24,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { apiFetch } from '@/lib/api-client';
 import { MemberEntryResponse } from '@/lib/contracts/member-entry';
@@ -274,7 +275,7 @@ export function OnboardingForm() {
               />
 
               <div className="flex flex-col gap-2">
-                <FormLabel htmlFor="onboarding-new-interest">Interests</FormLabel>
+                <Label htmlFor="onboarding-new-interest">Interests</Label>
                 <div className="flex gap-2">
                   <Input
                     id="onboarding-new-interest"
@@ -332,7 +333,15 @@ export function OnboardingForm() {
                     Add at least one interest — shared hobbies drive the match score.
                   </p>
                 )}
-                <FormField control={form.control} name="interests" render={() => <FormMessage />} />
+                <FormField
+                  control={form.control}
+                  name="interests"
+                  render={() => (
+                    <FormItem>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               <div className="flex justify-end gap-3 border-t border-border pt-5">

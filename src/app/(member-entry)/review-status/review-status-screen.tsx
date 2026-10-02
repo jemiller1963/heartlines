@@ -2,6 +2,7 @@
 
 'use client';
 
+import { VerificationIdUploader } from '@/components/custom/verification-id-uploader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export function ReviewStatusScreen() {
@@ -17,17 +18,19 @@ export function ReviewStatusScreen() {
       </div>
       <Card className="border-brand-200/70 bg-card shadow-brand dark:border-brand-800/70">
         <CardHeader>
-          <CardTitle className="text-h4">You’re all set for now</CardTitle>
+          <CardTitle className="text-h4">Profile review is underway</CardTitle>
           <CardDescription>
-            There’s nothing else you need to do while we take a look.
+            You can check back here while the profile-review decision is pending.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Please check back soon for your next step.
+            Identity verification is handled separately below and never makes your ID visible to
+            other members.
           </p>
         </CardContent>
       </Card>
+      <VerificationIdUploader />
     </div>
   );
 }

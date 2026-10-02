@@ -42,7 +42,7 @@ export async function GET() {
 
   const submissions = await prisma.idVerification.findMany({
     where: { userId: { in: profiles.map((p) => p.userId) } },
-    select: { userId: true, imagePath: true, status: true, submittedAt: true },
+    select: { userId: true, status: true, submittedAt: true },
   });
   const submissionsByUser = new Map(submissions.map((s) => [s.userId, s]));
 
@@ -67,7 +67,9 @@ export async function GET() {
         age: p.age,
         location: p.location,
         submittedAt: sub.submittedAt.toISOString(),
-        imagePath: sub.imagePath,
+        // Never expose the private Blob URL. The same-origin route performs
+        // the admin check again immediately before streaming the object.
+        imagePath: `/api/admin/verifications/${encodeURIComponent(p.userId)}/image`,
         status: sub.status,
       };
     })

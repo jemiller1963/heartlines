@@ -25,8 +25,11 @@ export const userNextConfig: NextConfig = {
 /** Browser features (microphone/camera/geolocation). false = disabled. browsing-topics is never openable. */
 export const appCapabilities: AppCapabilities = {};
 
-/** Per-app extra CSP origins — frame/connect/media/font/img. Empty = same-origin only. */
-export const cspExtraSources: CspExtraSources = {};
+/** Per-app extra CSP origins — frame/connect/media/font/img. */
+export const cspExtraSources: CspExtraSources = {
+  // @vercel/blob client-token and presigned writes use https://vercel.com/api/blob.
+  connectSrc: ['https://vercel.com'],
+};
 
 export type ConfigPlugin = (config: NextConfig) => NextConfig;
 
