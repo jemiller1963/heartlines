@@ -1,6 +1,6 @@
 // @polsia:user-owned — your email templates. Edit, add, or delete freely.
 // Each template returns { subject, html, text }; send it via the framework transport:
-//   import { sendEmail } from '@/lib/email/send';
+//   import { sendEmail } from '@/lib/email/resend';
 //   import { welcomeEmail } from '@/lib/email/templates';
 //   await sendEmail({ to: user.email, ...welcomeEmail({ name: user.name }) });
 // renderEmail() is a plain inline-styled shell — email clients drop <style>/<link>, so style inline.
@@ -77,6 +77,34 @@ export function welcomeEmail(input: { name: string; ctaUrl?: string }): EmailCon
     footer: 'You received this because you created an account.',
   });
   return { subject: 'Welcome aboard', html, text };
+}
+
+/** Password reset email generated from Better Auth's signed reset URL. */
+export function passwordResetEmail(input: {
+  name?: string | null;
+  resetUrl: string;
+}): EmailContent {
+  const { html, text } = renderEmail({
+    heading: 'Reset your Heart Lines password',
+    body: [
+      `Hi ${input.name?.trim() || 'there'},`,
+      'We received a request to reset your Heart Lines password.',
+      'Use the link below to choose a new password. The link expires in about an hour.',
+      "If you didn't request this, you can safely ignore this email.",
+    ],
+    cta: {
+      label: 'Reset your password',
+      url: input.resetUrl,
+    },
+    footer:
+      'You received this because a password reset was requested for your Heart Lines account.',
+  });
+
+  return {
+    subject: 'Reset your Heart Lines password',
+    html,
+    text,
+  };
 }
 
 /** Generic notification email. */

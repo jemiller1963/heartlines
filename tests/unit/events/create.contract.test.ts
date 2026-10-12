@@ -113,7 +113,7 @@ vi.mock('@/lib/require-auth', () => ({
   requireAuth: mocks.requireAuth,
   getSessionUser: vi.fn(),
 }));
-vi.mock('@/lib/email/send', () => ({ sendEmail: mocks.email.sendEmail }));
+vi.mock('@/lib/email/resend', () => ({ sendEmail: mocks.email.sendEmail }));
 
 const SESSION_ID = 'viewer-user';
 const BODY = {

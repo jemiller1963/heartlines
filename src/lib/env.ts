@@ -34,7 +34,7 @@ export const env = createEnv({
     POLSIA_API_TOKEN: z.string().min(1).optional(),
     // @polsia:contrib ai end
     // @polsia:contrib email start
-    POLSIA_EMAIL_PROXY_URL: z.string().url(),
+    POLSIA_EMAIL_PROXY_URL: z.string().url().default('http://127.0.0.1:9'),
     // @polsia:contrib email end
     // @polsia:contrib stripe-billing start
     POLSIA_API_BASE_URL: z.string().url().default('https://polsia.com'),
