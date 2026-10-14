@@ -28,7 +28,7 @@ import {
   EventQuery,
 } from '@/lib/contracts/events';
 import { prisma } from '@/lib/db';
-import { sendEmail } from '@/lib/email/send';
+import { sendEmail } from '@/lib/email/resend';
 import { eventCreatedEmail } from '@/lib/email/templates';
 import { authOrResponse } from '@/lib/require-auth-result';
 

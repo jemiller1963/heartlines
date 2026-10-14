@@ -1,5 +1,5 @@
 // @polsia:user-owned — POST /api/waitlist. Persists a landing-page signup and
-// fires a confirmation email via the platform email proxy.
+// fires a confirmation email through the transactional email transport.
 //
 // Public/anonymous: NO requireAuth() (waitlist is a landing-page signup).
 // Validation runs through the zod contract BEFORE we touch Prisma. The
@@ -12,7 +12,7 @@ import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { WaitlistSignupCreate, WaitlistSignupItem } from '@/lib/contracts/waitlist';
 import { prisma } from '@/lib/db';
-import { sendEmail } from '@/lib/email/send';
+import { sendEmail } from '@/lib/email/resend';
 import { waitlistConfirmation } from '@/lib/email/templates';
 
 export const dynamic = 'force-dynamic';

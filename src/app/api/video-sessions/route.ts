@@ -34,7 +34,7 @@ import {
   VideoSessionStatus,
 } from '@/lib/contracts/video-sessions';
 import { prisma } from '@/lib/db';
-import { sendEmail } from '@/lib/email/send';
+import { sendEmail } from '@/lib/email/resend';
 import { videoSessionRequest } from '@/lib/email/templates';
 import { env } from '@/lib/env';
 import { authOrResponse } from '@/lib/require-auth-result';
