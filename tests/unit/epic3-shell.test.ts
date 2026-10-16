@@ -11,9 +11,7 @@ const mocks = vi.hoisted(() => ({
   authOrResponse: vi.fn(),
   prisma: { profile: { findUnique: vi.fn() } },
 }));
-vi.mock('@/lib/require-auth-result', () => ({
-  authOrResponse: mocks.authOrResponse,
-}));
+vi.mock('@/lib/require-auth-result', () => ({ authOrResponse: mocks.authOrResponse }));
 vi.mock('@/lib/db', () => ({ prisma: mocks.prisma }));
 
 const root = process.cwd();
@@ -25,9 +23,7 @@ describe('Epic 3 structural shells', () => {
     expect(publicLayout).toContain('<SiteNav enabled />');
     expect(publicLayout).toContain('<SiteFooter enabled />');
     expect(source('src/app/(dashboard)/layout.tsx')).toContain('<DashboardShell>');
-    expect(source('src/app/(member-entry)/layout.tsx')).toContain(
-      'DashboardShell variant="minimal"',
-    );
+    expect(source('src/app/(member-entry)/layout.tsx')).toContain('DashboardShell variant="minimal"');
     const siteNav = source('src/components/custom/site-nav.tsx');
     expect(siteNav).not.toContain('isMemberRoute');
     expect(siteNav).not.toContain('member-routes');
@@ -68,27 +64,19 @@ describe('Epic 3 structural shells', () => {
     const dashboard = source('src/app/(dashboard)/dashboard/page.tsx');
     expect(dashboard).toContain("apiFetch('/api/member-entry'");
     expect(dashboard).not.toMatch(/Overview|Customer dashboard|Admin dashboard|Starter/);
-    expect(source('src/components/custom/sign-in-form.tsx')).toContain(
-      "apiFetch('/api/member-entry'",
-    );
-    expect(source('src/app/(member-entry)/onboarding/onboarding-form.tsx')).toContain(
-      "apiFetch('/api/member-entry'",
-    );
+    expect(source('src/components/custom/sign-in-form.tsx')).toContain("apiFetch('/api/member-entry'");
+    const onboarding = source('src/app/(member-entry)/onboarding/onboarding-form.tsx');
+    expect(onboarding).not.toContain("apiFetch('/api/member-entry'");
+    expect(onboarding).toContain("apiFetch<ProfileItem>('/api/profile'");
     expect(source('src/app/(dashboard)/admin/profiles/page.tsx')).toContain('requireAdmin');
     expect(source('src/app/(dashboard)/admin/profiles/page.tsx')).not.toContain('member-entry');
-    expect(source('src/components/custom/dashboard/dashboard-shell.tsx')).toContain(
-      "router.replace('/login')",
-    );
+    expect(source('src/components/custom/dashboard/dashboard-shell.tsx')).toContain("router.replace('/login')");
   });
 
   it('keeps standalone onboarding labels out of FormField-only primitives', () => {
     const onboarding = source('src/app/(member-entry)/onboarding/onboarding-form.tsx');
-    expect(onboarding).toContain(
-      '<Label htmlFor="onboarding-new-interest">Interests</Label>',
-    );
-    expect(onboarding).not.toContain(
-      '<FormLabel htmlFor="onboarding-new-interest">Interests</FormLabel>',
-    );
+    expect(onboarding).toContain('<Label htmlFor="onboarding-new-interest">Interests</Label>');
+    expect(onboarding).not.toContain('<FormLabel htmlFor="onboarding-new-interest">Interests</FormLabel>');
     expect(onboarding).toMatch(
       /name="interests"[\s\S]*?render=\{\(\) => \([\s\S]*?<FormItem>[\s\S]*?<FormMessage \/>[\s\S]*?<\/FormItem>[\s\S]*?\)\}/,
     );
@@ -130,13 +118,8 @@ describe('centralized member entry', () => {
   });
 
   it('uses only Profile.reviewStatus in the member-entry API', async () => {
-    mocks.authOrResponse.mockResolvedValue({
-      ok: true,
-      session: { id: 'member-1' },
-    });
-    mocks.prisma.profile.findUnique.mockResolvedValue({
-      reviewStatus: 'APPROVED',
-    });
+    mocks.authOrResponse.mockResolvedValue({ ok: true, session: { id: 'member-1' } });
+    mocks.prisma.profile.findUnique.mockResolvedValue({ reviewStatus: 'APPROVED' });
     const { GET } = await import('@/app/api/member-entry/route');
     const response = await GET(new Request('http://localhost/api/member-entry'));
     expect(await response.json()).toEqual({ destination: '/feed' });
