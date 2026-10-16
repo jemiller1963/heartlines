@@ -194,25 +194,17 @@ export function OnboardingForm() {
     if (!valid) return;
 
     if (step === 1 && !form.getValues('distancePreference')) {
-      form.setError(
-        'distancePreference',
-        {
-          type: 'manual',
-          message: 'Choose how far you are open to connecting',
-        },
-        { shouldFocus: true },
-      );
+      form.setError('distancePreference', {
+        type: 'manual',
+        message: 'Choose how far you are open to connecting',
+      }, { shouldFocus: true });
       return;
     }
     if (step === 2 && !form.getValues('relationshipIntent')) {
-      form.setError(
-        'relationshipIntent',
-        {
-          type: 'manual',
-          message: 'Choose the kind of connection you are looking for',
-        },
-        { shouldFocus: true },
-      );
+      form.setError('relationshipIntent', {
+        type: 'manual',
+        message: 'Choose the kind of connection you are looking for',
+      }, { shouldFocus: true });
       return;
     }
 
@@ -237,21 +229,14 @@ export function OnboardingForm() {
       setNewInterest('');
       return;
     }
-    form.setValue('interests', [...existing, trimmed], {
-      shouldValidate: true,
-      shouldDirty: true,
-    });
+    form.setValue('interests', [...existing, trimmed], { shouldValidate: true, shouldDirty: true });
     setNewInterest('');
   }, [form, newInterest]);
 
   const interests = form.watch('interests') ?? [];
 
   if (!loaded) {
-    return (
-      <div className="flex items-center justify-center py-12 text-muted-foreground">
-        Loading your profile…
-      </div>
-    );
+    return <div className="flex items-center justify-center py-12 text-muted-foreground">Loading your profile…</div>;
   }
 
   return (
@@ -260,25 +245,18 @@ export function OnboardingForm() {
         <p className="text-eyebrow">Welcome</p>
         <h1 className="text-h2 font-bold text-foreground">Tell us about yourself</h1>
         <p className="text-body text-muted-foreground">
-          Your answers help Heart Lines understand what matters to you. Matching-only answers stay
-          out of your public profile.
+          Your answers help Heart Lines understand what matters to you. Matching-only answers stay out of your public profile.
         </p>
         {session?.user ? (
           <p className="text-caption text-muted-foreground">
-            Setting up{' '}
-            <span className="font-medium text-foreground">
-              {session.user.name || session.user.email || 'your account'}
-            </span>
-            .
+            Setting up <span className="font-medium text-foreground">{session.user.name || session.user.email || 'your account'}</span>.
           </p>
         ) : null}
       </header>
 
       <div aria-label="Onboarding progress" className="space-y-2">
         <div className="flex items-center justify-between text-small text-muted-foreground">
-          <span>
-            Step {step + 1} of {ONBOARDING_STEP_TITLES.length}
-          </span>
+          <span>Step {step + 1} of {ONBOARDING_STEP_TITLES.length}</span>
           <span>{ONBOARDING_STEP_TITLES[step]}</span>
         </div>
         <progress className="h-2 w-full" max={100} value={onboardingProgressPercent(step)}>
@@ -326,125 +304,52 @@ export function OnboardingForm() {
             >
               {step === 0 ? (
                 <>
-                  <FormField
-                    control={form.control}
-                    name="age"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Age</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            inputMode="numeric"
-                            min={50}
-                            max={120}
-                            value={Number.isFinite(field.value) ? String(field.value) : ''}
-                            onChange={(e) =>
-                              field.onChange(
-                                e.target.value === '' ? Number.NaN : Number(e.target.value),
-                              )
-                            }
-                          />
-                        </FormControl>
-                        <FormDescription>Heart Lines is for people 50 and older.</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="location"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>City</FormLabel>
-                        <FormControl>
-                          <Input
-                            autoComplete="address-level2"
-                            placeholder="Waynesboro"
-                            value={field.value ?? ''}
-                            onChange={field.onChange}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="bio"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Bio</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            rows={4}
-                            maxLength={500}
-                            placeholder="A short introduction about you."
-                            value={field.value ?? ''}
-                            onChange={field.onChange}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <FormField control={form.control} name="age" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Age</FormLabel>
+                      <FormControl><Input type="number" inputMode="numeric" min={50} max={120} value={Number.isFinite(field.value) ? String(field.value) : ''} onChange={(e) => field.onChange(e.target.value === '' ? Number.NaN : Number(e.target.value))} /></FormControl>
+                      <FormDescription>Heart Lines is for people 50 and older.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="location" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>City</FormLabel>
+                      <FormControl><Input autoComplete="address-level2" placeholder="Waynesboro" value={field.value ?? ''} onChange={field.onChange} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="bio" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Bio</FormLabel>
+                      <FormControl><Textarea rows={4} maxLength={500} placeholder="A short introduction about you." value={field.value ?? ''} onChange={field.onChange} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
                   <div className="flex flex-col gap-2">
                     <Label htmlFor="onboarding-new-interest">Interests</Label>
                     <div className="flex gap-2">
-                      <Input
-                        id="onboarding-new-interest"
-                        value={newInterest}
-                        onChange={(e) => setNewInterest(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAddInterest();
-                          }
-                        }}
-                        placeholder="Hiking, jazz, cooking…"
-                      />
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={handleAddInterest}
-                        disabled={!newInterest.trim()}
-                      >
-                        <Plus aria-hidden="true" />
-                        Add
-                      </Button>
+                      <Input id="onboarding-new-interest" value={newInterest} onChange={(e) => setNewInterest(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddInterest(); } }} placeholder="Hiking, jazz, cooking…" />
+                      <Button type="button" variant="secondary" onClick={handleAddInterest} disabled={!newInterest.trim()}><Plus aria-hidden="true" />Add</Button>
                     </div>
                     {interests.length ? (
                       <ul className="mt-2 flex flex-wrap gap-1.5">
                         {interests.map((interest) => (
-                          <li
-                            key={interest}
-                            className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-caption font-medium text-brand-800 dark:border-brand-700 dark:bg-brand-900/30 dark:text-brand-100"
-                          >
+                          <li key={interest} className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-caption font-medium text-brand-800 dark:border-brand-700 dark:bg-brand-900/30 dark:text-brand-100">
                             {interest}
-                            <button
-                              type="button"
-                              aria-label={`Remove ${interest}`}
-                              className="ml-1 rounded-full p-0.5"
-                              onClick={() =>
-                                form.setValue(
-                                  'interests',
-                                  interests.filter((value) => value !== interest),
-                                  { shouldValidate: true, shouldDirty: true },
-                                )
-                              }
-                            >
-                              <X aria-hidden="true" className="size-3" />
-                            </button>
+                            <button type="button" aria-label={`Remove ${interest}`} className="ml-1 rounded-full p-0.5" onClick={() => form.setValue('interests', interests.filter((value) => value !== interest), { shouldValidate: true, shouldDirty: true })}><X aria-hidden="true" className="size-3" /></button>
                           </li>
                         ))}
                       </ul>
-                    ) : (
-                      <p className="text-small text-muted-foreground">Add at least one interest.</p>
-                    )}
+                    ) : <p className="text-small text-muted-foreground">Add at least one interest.</p>}
                     <FormField
                       control={form.control}
                       name="interests"
-                      render={() => <FormMessage />}
+                      render={() => (
+                        <FormItem>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
                   </div>
                 </>
@@ -452,175 +357,84 @@ export function OnboardingForm() {
 
               {step === 1 ? (
                 <>
-                  <FormField
-                    control={form.control}
-                    name="distancePreference"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>How far are you open to connecting?</FormLabel>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          {DistancePreference.options.map((option) => (
-                            <Button
-                              key={option}
-                              type="button"
-                              variant={field.value === option ? 'default' : 'outline'}
-                              aria-pressed={field.value === option}
-                              onClick={() => field.onChange(option)}
-                            >
-                              {LABELS[option]}
-                            </Button>
-                          ))}
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="lifestyleCharacteristics"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Lifestyle</FormLabel>
-                        <FormDescription>Choose any that describe you.</FormDescription>
-                        <div className="flex flex-wrap gap-2">
-                          {LifestyleCharacteristic.options.map((option) => {
-                            const active = (field.value ?? []).includes(option);
-                            return (
-                              <Button
-                                key={option}
-                                type="button"
-                                variant={active ? 'default' : 'outline'}
-                                aria-pressed={active}
-                                onClick={() =>
-                                  field.onChange(toggleValue(field.value ?? [], option))
-                                }
-                              >
-                                {LABELS[option]}
-                              </Button>
-                            );
-                          })}
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <FormField control={form.control} name="distancePreference" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>How far are you open to connecting?</FormLabel>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {DistancePreference.options.map((option) => (
+                          <Button key={option} type="button" variant={field.value === option ? 'default' : 'outline'} aria-pressed={field.value === option} onClick={() => field.onChange(option)}>{LABELS[option]}</Button>
+                        ))}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="lifestyleCharacteristics" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Lifestyle</FormLabel>
+                      <FormDescription>Choose any that describe you.</FormDescription>
+                      <div className="flex flex-wrap gap-2">
+                        {LifestyleCharacteristic.options.map((option) => {
+                          const active = (field.value ?? []).includes(option);
+                          return <Button key={option} type="button" variant={active ? 'default' : 'outline'} aria-pressed={active} onClick={() => field.onChange(toggleValue(field.value ?? [], option))}>{LABELS[option]}</Button>;
+                        })}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
                 </>
               ) : null}
 
               {step === 2 ? (
                 <>
-                  <FormField
-                    control={form.control}
-                    name="relationshipIntent"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>What kind of connection are you looking for?</FormLabel>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          {RelationshipIntent.options.map((option) => (
-                            <Button
-                              key={option}
-                              type="button"
-                              variant={field.value === option ? 'default' : 'outline'}
-                              aria-pressed={field.value === option}
-                              onClick={() => field.onChange(option)}
-                            >
-                              {LABELS[option]}
-                            </Button>
-                          ))}
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="partnerPreferences"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>What qualities matter to you in a partner?</FormLabel>
-                        <FormDescription>Choose up to eight.</FormDescription>
-                        <div className="flex flex-wrap gap-2">
-                          {PartnerPreference.options.map((option) => {
-                            const active = (field.value ?? []).includes(option);
-                            return (
-                              <Button
-                                key={option}
-                                type="button"
-                                variant={active ? 'default' : 'outline'}
-                                aria-pressed={active}
-                                onClick={() =>
-                                  field.onChange(toggleValue(field.value ?? [], option))
-                                }
-                              >
-                                {LABELS[option]}
-                              </Button>
-                            );
-                          })}
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </>
-              ) : null}
-
-              {step === 3 ? (
-                <FormField
-                  control={form.control}
-                  name="valuesPriorities"
-                  render={({ field }) => (
+                  <FormField control={form.control} name="relationshipIntent" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Which values matter most to you?</FormLabel>
+                      <FormLabel>What kind of connection are you looking for?</FormLabel>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {RelationshipIntent.options.map((option) => <Button key={option} type="button" variant={field.value === option ? 'default' : 'outline'} aria-pressed={field.value === option} onClick={() => field.onChange(option)}>{LABELS[option]}</Button>)}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="partnerPreferences" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>What qualities matter to you in a partner?</FormLabel>
                       <FormDescription>Choose up to eight.</FormDescription>
                       <div className="flex flex-wrap gap-2">
-                        {ValuePriority.options.map((option) => {
+                        {PartnerPreference.options.map((option) => {
                           const active = (field.value ?? []).includes(option);
-                          return (
-                            <Button
-                              key={option}
-                              type="button"
-                              variant={active ? 'default' : 'outline'}
-                              aria-pressed={active}
-                              onClick={() => field.onChange(toggleValue(field.value ?? [], option))}
-                            >
-                              {LABELS[option]}
-                            </Button>
-                          );
+                          return <Button key={option} type="button" variant={active ? 'default' : 'outline'} aria-pressed={active} onClick={() => field.onChange(toggleValue(field.value ?? [], option))}>{LABELS[option]}</Button>;
                         })}
                       </div>
                       <FormMessage />
                     </FormItem>
-                  )}
-                />
+                  )} />
+                </>
+              ) : null}
+
+              {step === 3 ? (
+                <FormField control={form.control} name="valuesPriorities" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Which values matter most to you?</FormLabel>
+                    <FormDescription>Choose up to eight.</FormDescription>
+                    <div className="flex flex-wrap gap-2">
+                      {ValuePriority.options.map((option) => {
+                        const active = (field.value ?? []).includes(option);
+                        return <Button key={option} type="button" variant={active ? 'default' : 'outline'} aria-pressed={active} onClick={() => field.onChange(toggleValue(field.value ?? [], option))}>{LABELS[option]}</Button>;
+                      })}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )} />
               ) : null}
 
               <div className="flex items-center justify-between gap-3 border-t border-border pt-5">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setSaved(false);
-                    setStep(Math.max(0, step - 1) as OnboardingStep);
-                  }}
-                  disabled={step === 0 || form.formState.isSubmitting}
-                >
-                  Back
-                </Button>
+                <Button type="button" variant="outline" onClick={() => { setSaved(false); setStep((Math.max(0, step - 1)) as OnboardingStep); }} disabled={step === 0 || form.formState.isSubmitting}>Back</Button>
                 <Button type="submit" disabled={form.formState.isSubmitting} size="lg">
-                  {form.formState.isSubmitting
-                    ? 'Saving…'
-                    : step === 3
-                      ? 'Save questionnaire'
-                      : 'Save and continue'}
+                  {form.formState.isSubmitting ? 'Saving…' : step === 3 ? 'Save questionnaire' : 'Save and continue'}
                 </Button>
               </div>
-              <p
-                aria-live="polite"
-                className={cn('text-small text-muted-foreground', !saved && 'sr-only')}
-              >
-                {saved
-                  ? 'Your questionnaire is saved. Review submission will happen in the next step of onboarding.'
-                  : ''}
+              <p aria-live="polite" className={cn('text-small text-muted-foreground', !saved && 'sr-only')}>
+                {saved ? 'Your questionnaire is saved. Review submission will happen in the next step of onboarding.' : ''}
               </p>
             </form>
           </Form>
