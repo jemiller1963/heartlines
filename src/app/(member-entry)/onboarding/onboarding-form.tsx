@@ -98,6 +98,7 @@ export function OnboardingForm() {
   const [step, setStep] = useState<OnboardingStep>(0);
   const [newInterest, setNewInterest] = useState('');
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
   const { data: session } = useMountedSession();
 
@@ -133,10 +134,8 @@ export function OnboardingForm() {
           });
           setStep(resumeOnboardingStep(data));
         }
-      } catch (err) {
-        if (!(err as Error).message?.includes('(204)')) {
-          toast.error('Could not load your profile.');
-        }
+      } catch {
+        toast.error('Could not load your profile.');
       } finally {
         if (!cancelled) setLoaded(true);
       }
@@ -183,6 +182,8 @@ export function OnboardingForm() {
   );
 
   const continueFromStep = useCallback(async () => {
+    if (saving) return;
+
     const fieldsByStep: Array<Array<keyof ProfileCreateType>> = [
       ['age', 'location', 'bio', 'interests'],
       ['distancePreference', 'lifestyleCharacteristics'],
@@ -194,32 +195,39 @@ export function OnboardingForm() {
     if (!valid) return;
 
     if (step === 1 && !form.getValues('distancePreference')) {
-      form.setError('distancePreference', {
-        type: 'manual',
-        message: 'Choose how far you are open to connecting',
-      }, { shouldFocus: true });
+      form.setError(
+        'distancePreference',
+        { type: 'manual', message: 'Choose how far you are open to connecting' },
+        { shouldFocus: true },
+      );
       return;
     }
     if (step === 2 && !form.getValues('relationshipIntent')) {
-      form.setError('relationshipIntent', {
-        type: 'manual',
-        message: 'Choose the kind of connection you are looking for',
-      }, { shouldFocus: true });
+      form.setError(
+        'relationshipIntent',
+        { type: 'manual', message: 'Choose the kind of connection you are looking for' },
+        { shouldFocus: true },
+      );
       return;
     }
 
-    const persisted = await saveValues(form.getValues());
-    if (!persisted) return;
+    setSaving(true);
+    try {
+      const persisted = await saveValues(form.getValues());
+      if (!persisted) return;
 
-    if (step < 3) {
-      setSaved(false);
-      setStep((step + 1) as OnboardingStep);
-      return;
+      if (step < 3) {
+        setSaved(false);
+        setStep((step + 1) as OnboardingStep);
+        return;
+      }
+
+      setSaved(true);
+      toast.success('Questionnaire saved.');
+    } finally {
+      setSaving(false);
     }
-
-    setSaved(true);
-    toast.success('Questionnaire saved.');
-  }, [form, saveValues, step]);
+  }, [form, saveValues, saving, step]);
 
   const handleAddInterest = useCallback(() => {
     const trimmed = newInterest.trim();
@@ -360,11 +368,13 @@ export function OnboardingForm() {
                   <FormField control={form.control} name="distancePreference" render={({ field }) => (
                     <FormItem>
                       <FormLabel>How far are you open to connecting?</FormLabel>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {DistancePreference.options.map((option) => (
-                          <Button key={option} type="button" variant={field.value === option ? 'default' : 'outline'} aria-pressed={field.value === option} onClick={() => field.onChange(option)}>{LABELS[option]}</Button>
-                        ))}
-                      </div>
+                      <FormControl>
+                        <div role="group" className="grid gap-2 sm:grid-cols-2">
+                          {DistancePreference.options.map((option) => (
+                            <Button key={option} type="button" variant={field.value === option ? 'default' : 'outline'} aria-pressed={field.value === option} onClick={() => field.onChange(option)}>{LABELS[option]}</Button>
+                          ))}
+                        </div>
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -372,12 +382,14 @@ export function OnboardingForm() {
                     <FormItem>
                       <FormLabel>Lifestyle</FormLabel>
                       <FormDescription>Choose any that describe you.</FormDescription>
-                      <div className="flex flex-wrap gap-2">
-                        {LifestyleCharacteristic.options.map((option) => {
-                          const active = (field.value ?? []).includes(option);
-                          return <Button key={option} type="button" variant={active ? 'default' : 'outline'} aria-pressed={active} onClick={() => field.onChange(toggleValue(field.value ?? [], option))}>{LABELS[option]}</Button>;
-                        })}
-                      </div>
+                      <FormControl>
+                        <div role="group" className="flex flex-wrap gap-2">
+                          {LifestyleCharacteristic.options.map((option) => {
+                            const active = (field.value ?? []).includes(option);
+                            return <Button key={option} type="button" variant={active ? 'default' : 'outline'} aria-pressed={active} onClick={() => field.onChange(toggleValue(field.value ?? [], option))}>{LABELS[option]}</Button>;
+                          })}
+                        </div>
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -389,9 +401,11 @@ export function OnboardingForm() {
                   <FormField control={form.control} name="relationshipIntent" render={({ field }) => (
                     <FormItem>
                       <FormLabel>What kind of connection are you looking for?</FormLabel>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {RelationshipIntent.options.map((option) => <Button key={option} type="button" variant={field.value === option ? 'default' : 'outline'} aria-pressed={field.value === option} onClick={() => field.onChange(option)}>{LABELS[option]}</Button>)}
-                      </div>
+                      <FormControl>
+                        <div role="group" className="grid gap-2 sm:grid-cols-2">
+                          {RelationshipIntent.options.map((option) => <Button key={option} type="button" variant={field.value === option ? 'default' : 'outline'} aria-pressed={field.value === option} onClick={() => field.onChange(option)}>{LABELS[option]}</Button>)}
+                        </div>
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -399,12 +413,14 @@ export function OnboardingForm() {
                     <FormItem>
                       <FormLabel>What qualities matter to you in a partner?</FormLabel>
                       <FormDescription>Choose up to eight.</FormDescription>
-                      <div className="flex flex-wrap gap-2">
-                        {PartnerPreference.options.map((option) => {
-                          const active = (field.value ?? []).includes(option);
-                          return <Button key={option} type="button" variant={active ? 'default' : 'outline'} aria-pressed={active} onClick={() => field.onChange(toggleValue(field.value ?? [], option))}>{LABELS[option]}</Button>;
-                        })}
-                      </div>
+                      <FormControl>
+                        <div role="group" className="flex flex-wrap gap-2">
+                          {PartnerPreference.options.map((option) => {
+                            const active = (field.value ?? []).includes(option);
+                            return <Button key={option} type="button" variant={active ? 'default' : 'outline'} aria-pressed={active} onClick={() => field.onChange(toggleValue(field.value ?? [], option))}>{LABELS[option]}</Button>;
+                          })}
+                        </div>
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -416,21 +432,23 @@ export function OnboardingForm() {
                   <FormItem>
                     <FormLabel>Which values matter most to you?</FormLabel>
                     <FormDescription>Choose up to eight.</FormDescription>
-                    <div className="flex flex-wrap gap-2">
-                      {ValuePriority.options.map((option) => {
-                        const active = (field.value ?? []).includes(option);
-                        return <Button key={option} type="button" variant={active ? 'default' : 'outline'} aria-pressed={active} onClick={() => field.onChange(toggleValue(field.value ?? [], option))}>{LABELS[option]}</Button>;
-                      })}
-                    </div>
+                    <FormControl>
+                      <div role="group" className="flex flex-wrap gap-2">
+                        {ValuePriority.options.map((option) => {
+                          const active = (field.value ?? []).includes(option);
+                          return <Button key={option} type="button" variant={active ? 'default' : 'outline'} aria-pressed={active} onClick={() => field.onChange(toggleValue(field.value ?? [], option))}>{LABELS[option]}</Button>;
+                        })}
+                      </div>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
               ) : null}
 
               <div className="flex items-center justify-between gap-3 border-t border-border pt-5">
-                <Button type="button" variant="outline" onClick={() => { setSaved(false); setStep((Math.max(0, step - 1)) as OnboardingStep); }} disabled={step === 0 || form.formState.isSubmitting}>Back</Button>
-                <Button type="submit" disabled={form.formState.isSubmitting} size="lg">
-                  {form.formState.isSubmitting ? 'Saving…' : step === 3 ? 'Save questionnaire' : 'Save and continue'}
+                <Button type="button" variant="outline" onClick={() => { setSaved(false); setStep((Math.max(0, step - 1)) as OnboardingStep); }} disabled={step === 0 || saving}>Back</Button>
+                <Button type="submit" disabled={saving} size="lg">
+                  {saving ? 'Saving…' : step === 3 ? 'Save questionnaire' : 'Save and continue'}
                 </Button>
               </div>
               <p aria-live="polite" className={cn('text-small text-muted-foreground', !saved && 'sr-only')}>

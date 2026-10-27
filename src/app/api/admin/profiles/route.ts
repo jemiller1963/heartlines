@@ -1,5 +1,5 @@
-// @polsia:user-owned — admin-only listing of recently created profiles for
-// the moderation review queue.
+// @polsia:user-owned — admin-only listing of submitted profiles for the
+// moderation review queue.
 //
 // Joins two tables (Profile, User) by SCALAR id — never a Prisma `@relation`
 // back to `User` (auth.prisma is framework-owned and the ownership gate
@@ -7,9 +7,8 @@
 //
 // Gates inline (auth.api.getSession + role === 'admin') — returns 401/403
 // rather than redirecting, because a redirect turns a fetch into a 307 that
-// the client island can't render. The future page wrapper will use
-// `requireAdmin()` for the redirect-on-arrival path; this endpoint is the
-// live mutation surface.
+// the client island can't render. The page wrapper uses `requireAdmin()` for
+// the redirect-on-arrival path; this endpoint is the live mutation surface.
 
 import 'server-only';
 import { headers } from 'next/headers';
@@ -19,6 +18,8 @@ import { AdminProfileList } from '@/lib/contracts/admin';
 import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
+
+const SUBMITTED_REVIEW_STATUSES = ['PENDING', 'APPROVED', 'FLAGGED'] as const;
 
 export async function GET() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -30,6 +31,7 @@ export async function GET() {
   }
 
   const profiles = await prisma.profile.findMany({
+    where: { reviewStatus: { in: [...SUBMITTED_REVIEW_STATUSES] } },
     select: {
       id: true,
       userId: true,

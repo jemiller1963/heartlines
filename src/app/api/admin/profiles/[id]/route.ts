@@ -1,10 +1,9 @@
-// @polsia:user-owned — admin approve/flag for one profile row.
+// @polsia:user-owned — admin approve/flag for one submitted profile row.
 //
 // Flips Profile.reviewStatus (PENDING → APPROVED or FLAGGED) inside a single
 // update; re-reads the row so the wire response carries the freshly persisted
-// state instead of operator-side guesswork. Returns the post-mutation merged
-// item so the client island can patch the row in place without refetching
-// the list.
+// state instead of operator-side guesswork. DRAFT rows are not reviewable;
+// Slice 4 owns the explicit DRAFT → PENDING submission transition.
 //
 // Gates inline (auth.api.getSession + role === 'admin') — returns 401/403
 // rather than redirecting. requireAdmin() redirects, which turns the client
@@ -43,14 +42,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
   const { action } = parsed.data;
 
-  // Existence check — 404 if the row is gone (404 also covers "row exists but
-  // caller can't see it", same shape as the verifications endpoint).
   const existing = await prisma.profile.findUnique({
     where: { id },
-    select: { id: true },
+    select: { id: true, reviewStatus: true },
   });
   if (!existing) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+  if (existing.reviewStatus === 'DRAFT') {
+    return NextResponse.json(
+      { error: 'Profile has not been submitted for review.' },
+      { status: 409 },
+    );
   }
 
   const next: 'APPROVED' | 'FLAGGED' = action === 'approve' ? 'APPROVED' : 'FLAGGED';

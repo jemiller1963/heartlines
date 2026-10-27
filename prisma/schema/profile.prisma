@@ -16,12 +16,12 @@ enum VerificationStatus {
   rejected
 }
 
-// Admin moderation state for the profile-review queue. New rows land in
-// `PENDING`; the future admin GET /api/admin/profiles and the page it powers
-// will flip rows to `APPROVED` or `FLAGGED`. Three values keep the enum
-// deliberately small — the road is "review queue → decision", not a state
-// machine with half a dozen transient statuses.
+// Profile moderation lifecycle. Questionnaire persistence starts in DRAFT so
+// partially completed onboarding never enters the admin review queue. Slice 4
+// owns the explicit DRAFT → PENDING submit-for-review transition. Existing
+// PENDING / APPROVED / FLAGGED rows retain their meanings.
 enum ReviewStatus {
+  DRAFT
   PENDING
   APPROVED
   FLAGGED
@@ -52,9 +52,9 @@ model Profile {
   // Owner-only ID verification state. Flipped to `pending` by POST on
   // /api/profile/verification-id; admin review will set `approved`/`rejected`.
   verificationStatus VerificationStatus? @default(unverified)
-  // Admin moderation state. Defaults to `PENDING` for every new Profile row so
-  // the review queue (`GET /api/admin/profiles`) sees it on first pass.
-  reviewStatus      ReviewStatus       @default(PENDING)
+  // Saved onboarding data is a draft until Slice 4 explicitly submits it.
+  // Admin moderation APIs exclude DRAFT rows.
+  reviewStatus      ReviewStatus       @default(DRAFT)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
